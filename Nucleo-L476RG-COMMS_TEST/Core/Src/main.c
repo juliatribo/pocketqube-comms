@@ -116,7 +116,7 @@ int main(void)
   {
 	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 	  HAL_Delay(1000);
-	  prueba();
+	  prueba();	//COMMS TEST FUNCTION
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

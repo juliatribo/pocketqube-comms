@@ -181,16 +181,23 @@ void PendSV_Handler(void)
 /**
   * @brief This function handles System tick timer.
   */
-//void SysTick_Handler(void)
-//{
+//
+//
+//
+//CHECK IF THIS FUNCTION IS NECESSARY AND CHANGE DE NAME!!!!!!!!!!!!!!!!!
+//
+//
+//
+void SysTick_HandlerABCD(void)
+{
   /* USER CODE BEGIN SysTick_IRQn 0 */
 
   /* USER CODE END SysTick_IRQn 0 */
-//  HAL_IncTick();
+  HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
 
   /* USER CODE END SysTick_IRQn 1 */
-//}
+}
 
 /******************************************************************************/
 /* STM32L4xx Peripheral Interrupt Handlers                                    */
@@ -216,17 +223,24 @@ void SPI2_IRQHandler(void)
 /**
   * @brief This function handles EXTI line[15:10] interrupts.
   */
-//void EXTI15_10_IRQHandler(void)
-//{
+//
+//
+//
+//CHECK IF THIS FUNCTION IS NECESSARY AND CHANGE DE NAME!!!!!!!!!!!!!!!!!
+//
+//
+//
+void EXTI15_10_IRQHandlerABCD(void)
+{
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 
   /* USER CODE END EXTI15_10_IRQn 0 */
-//  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_10);
-//  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_10);
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
 
   /* USER CODE END EXTI15_10_IRQn 1 */
-//}
+}
 
 /* USER CODE BEGIN 1 */
 

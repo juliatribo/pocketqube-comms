@@ -36,7 +36,7 @@
 //    #error "Please define a frequency band in the compiler options."
 //#endif
 
-#define TX_OUTPUT_POWER                             14        // dBm
+#define TX_OUTPUT_POWER                             22        // dBm
 
 //#if defined( USE_MODEM_LORA )
 
@@ -49,7 +49,7 @@
                                                               //  2: 4/6,
                                                               //  3: 4/7,
                                                               //  4: 4/8]
-#define LORA_PREAMBLE_LENGTH                        108       // Same for Tx and Rx
+#define LORA_PREAMBLE_LENGTH                        8//108       // Same for Tx and Rx
 #define LORA_SYMBOL_TIMEOUT                         100       // Symbols
 #define LORA_FIX_LENGTH_PAYLOAD_ON                  false
 #define LORA_IQ_INVERSION_ON                        false
@@ -173,7 +173,7 @@ int8_t GetLastCadRssi( void );
 void DisplayCadRssivsTime( void );
 
 
-void prueba( void);
+void prueba( void );
 
 
 

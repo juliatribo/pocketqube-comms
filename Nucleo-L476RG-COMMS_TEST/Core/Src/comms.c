@@ -22,6 +22,19 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 Maintainer: Benjamin Boulet
 */
 
+/*	THINGS TO REVISE IN THIS CODE
+ * 	RF SWITCH connections are done on the opposite order
+ * 	We have to program the DIO2 on the contrary
+ *
+ *
+ *
+ *
+ *
+ *
+ */
+
+
+
 #include "comms.h"
 
 
@@ -76,6 +89,11 @@ void prueba( void )
 {
     uint16_t PacketCnt = 0, i=0;
     float Per = 0.0;
+    uint16_t txCounter = 0;
+    uint16_t bucleCounter = 0;
+    uint16_t defaultCounter = 0;
+    uint16_t rxCounter = 0;
+
 
     // Target board initialization
     BoardInitMcu( );
@@ -143,9 +161,36 @@ void prueba( void )
 #else
     State = TX;
 #endif
+    State = TX;
 
     while(  i < NB_TRY )
     {
+		DelayMs( 300 );
+    	bucleCounter = bucleCounter + 1;
+    	/*
+    	printf("Send Packet n %d \r\n",PacketCnt);
+		txCounter = txCounter + 1;
+		// Send the next frame
+		Buffer[0] = 'C';
+		Buffer[1] = 'A';
+		Buffer[2] = 'D';
+		Buffer[3] = '0';
+		Buffer[4] = PacketCnt>>8;
+		Buffer[5] = (uint8_t)PacketCnt ;
+
+		if( PacketCnt == 0xFFFF)
+		{
+			PacketCnt = 0;
+		}
+		else
+		{
+			PacketCnt ++;
+		}
+		//Send Frame
+		DelayMs( 100 );
+		Radio.Send( Buffer, 6 );
+		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+		DelayMs( 300 );*/
         switch( State )
         {
             case RX_TIMEOUT:
@@ -169,6 +214,7 @@ void prueba( void )
             }
             case RX:
             {
+            	rxCounter = rxCounter + 1;
                 if( PacketReceived == true )
                 {
                     PacketReceived = false;     // Reset flag
@@ -205,14 +251,20 @@ void prueba( void )
             case TX:
             {
                 printf("Send Packet n %d \r\n",PacketCnt);
-
+                txCounter = txCounter + 1;
                 // Send the next frame
-                Buffer[0] = 'C';
-                Buffer[1] = 'A';
-                Buffer[2] = 'D';
-                Buffer[3] = '0';
-                Buffer[4] = PacketCnt>>8;
-                Buffer[5] = (uint8_t)PacketCnt ;
+                Buffer[0] = 'H';
+                Buffer[1] = 'O';
+                Buffer[2] = 'L';
+                Buffer[3] = 'A';
+                Buffer[4] = ' ';
+                Buffer[5] = 'C';
+                Buffer[6] = 'O';
+                Buffer[7] = 'M';
+                Buffer[8] = 'M';
+                Buffer[9] = 'S';
+                Buffer[10] = PacketCnt>>8;
+                Buffer[11] = (uint8_t)PacketCnt ;
 
                 if( PacketCnt == 0xFFFF)
                 {
@@ -224,7 +276,8 @@ void prueba( void )
                 }
                 //Send Frame
                 DelayMs( 1 );
-                Radio.Send( Buffer, 6 );
+                Radio.Send( Buffer, 12 );
+                HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 
                 State = LOWPOWER;
                 break;
@@ -256,6 +309,8 @@ void prueba( void )
             }
             case LOWPOWER:
             default:
+            	defaultCounter = defaultCounter + 1;
+                State = TX;
                 // Set low power
                 break;
         }

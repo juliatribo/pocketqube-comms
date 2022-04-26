@@ -81,8 +81,8 @@ Maintainer: Miguel Luis and Gregory Cristian
 #define LED_1                                       PC_1	//Check this lines
 #define LED_2                                       PC_0	//Check this lines
 
-#define FR                                          PA_1	//Check this lines
-#define OPT                                         PB_0	//Check this lines
+#define FR                                          PA_1	//Check this lines NOT USED
+#define OPT                                         PB_0	//Check this lines NOT USED
 #define DEVICE_SEL                                  PA_4	//Check this lines
 
 /*!

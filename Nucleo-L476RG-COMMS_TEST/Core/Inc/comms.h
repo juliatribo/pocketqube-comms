@@ -54,6 +54,7 @@
 #define LORA_FIX_LENGTH_PAYLOAD_ON                  false
 #define LORA_IQ_INVERSION_ON                        false
 #define LORA_FIX_LENGTH_PAYLOAD_LEN                 19
+#define WINDOW_SIZE									20
 
 /*
 #elif defined( USE_MODEM_FSK )
@@ -71,9 +72,12 @@
 */
 
 #define RX_TIMEOUT_VALUE                            4000
-#define BUFFER_SIZE                                 64 // Define the payload size here
+//#define BUFFER_SIZE                                 64 // Define the payload size here
 
+#define BUFFER_SIZE                                 40 // Define the payload size here
 
+#define MEMORY_SIZE									300
+#define MEMORY_RX_SIZE								500
 
 
 /*!
@@ -174,6 +178,9 @@ void DisplayCadRssivsTime( void );
 
 
 void prueba( void );
+
+void txfunction( void );
+
 
 
 

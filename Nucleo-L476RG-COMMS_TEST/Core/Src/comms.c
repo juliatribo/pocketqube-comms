@@ -81,6 +81,24 @@ uint16_t RxTimeoutCnt = 0;
 uint16_t SymbTimeoutCnt = 0;
 int16_t RssiMoy = 0;
 int8_t SnrMoy = 0;
+uint16_t txCounter = 0;
+uint8_t Memory[MEMORY_SIZE] = {'H','O','L','A',',','S','O','C',' ','E','L',' ','D',
+    		'A','N','I','E','L',' ','D','E',' ','C','O','M','M','S','.','T','H','I',
+			'S',' ','I','S',' ','T','H','E',' ','1',' ','P','A','C','K','E','T','.',
+			'H','O','L','A',',','S','O','C',' ','E','L',' ','D',
+			'A','N','I','E','L',' ','D','E',' ','C','O','M','M','S','.','T','H','I',
+			'S',' ','I','S',' ','T','H','E',' ','2',' ','P','A','C','K','E','T','.',
+			'H','O','L','A',',','S','O','C',' ','E','L',' ','D',
+			'A','N','I','E','L',' ','D','E',' ','C','O','M','M','S','.','T','H','I',
+			'S',' ','I','S',' ','T','H','E',' ','3',' ','P','A','C','K','E','T','.',
+			'H','O','L','A',',','S','O','C',' ','E','L',' ','D',
+			'A','N','I','E','L',' ','D','E',' ','C','O','M','M','S','.','T','H','I',
+			'S',' ','I','S',' ','T','H','E',' ','4',' ','P','A','C','K','E','T','.',
+			'*','*','*','*','*','*','*','*','*','*','*','*','*','*','*','*','*','*',
+};
+
+uint8_t tx_non_stop = 1; //1 => yes ; 0 => not
+uint8_t testRX = false;
 
 /**
  * Main application entry point.
@@ -89,11 +107,39 @@ void prueba( void )
 {
     uint16_t PacketCnt = 0, i=0;
     float Per = 0.0;
-    uint16_t txCounter = 0;
     uint16_t bucleCounter = 0;
     uint16_t defaultCounter = 0;
     uint16_t rxCounter = 0;
+    uint16_t cadCounter = 0;
+    uint16_t failCADCounter = 0;
+    uint16_t test_counter = 0;
+    uint16_t tx_count = 0;
 
+    uint8_t MemoryRX[MEMORY_RX_SIZE] = {'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/'
+    };
 
     // Target board initialization
     BoardInitMcu( );
@@ -165,7 +211,7 @@ void prueba( void )
 
     while(  i < NB_TRY )
     {
-		DelayMs( 300 );
+		//DelayMs( 300 );
     	bucleCounter = bucleCounter + 1;
     	/*
     	printf("Send Packet n %d \r\n",PacketCnt);
@@ -181,7 +227,7 @@ void prueba( void )
 		if( PacketCnt == 0xFFFF)
 		{
 			PacketCnt = 0;
-		}
+		}<
 		else
 		{
 			PacketCnt ++;
@@ -191,6 +237,11 @@ void prueba( void )
 		Radio.Send( Buffer, 6 );
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 		DelayMs( 300 );*/
+    	if (tx_non_stop == 1){
+        	DelayMs( 300 );
+    	}else{
+    		DelayMs( 1 );
+    	}
         switch( State )
         {
             case RX_TIMEOUT:
@@ -199,7 +250,11 @@ void prueba( void )
                 printf( "RX Timeout\r\n");
 #endif
                 RxTimeoutCnt++;
-                State = START_CAD;
+                //State = START_CAD;
+                //Radio.Rx( RX_TIMEOUT_VALUE );	//Basic RX code
+				//DelayMs(1);	//Basic RX code
+                Radio.Standby;
+				State = LOWPOWER;
                 break;
             }
             case RX_ERROR:
@@ -209,24 +264,40 @@ void prueba( void )
 #endif
                 RxErrorCnt++;
                 PacketReceived = false;
-                State = START_CAD;
+                //State = START_CAD;
+                //Radio.Rx( RX_TIMEOUT_VALUE );	//Basic RX code
+				//DelayMs(1);	//Basic RX code
+                Radio.Standby;
+				State = LOWPOWER;
             break;
             }
             case RX:
             {
-            	rxCounter = rxCounter + 1;
+            	//HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
                 if( PacketReceived == true )
                 {
+                	if (testRX == 1){
+                		test_counter = test_counter + 1;
+            			for (uint8_t i=0; i<BUFFER_SIZE; i++){
+            				MemoryRX[i + rxCounter*BUFFER_SIZE] = Buffer[i];
+            			}
+            			rxCounter = rxCounter + 1;
+            			if (MEMORY_RX_SIZE < ( rxCounter*BUFFER_SIZE + BUFFER_SIZE )){
+            				rxCounter = 0;
+            			}
+            			testRX = 0;
+            			if (Buffer[0] == 'T' && Buffer[1] == 'X'){
+            				//txNonStop = true;
+            				//txNonStopNum = 1;
+            				tx_non_stop = 1;
+            			}
+                	}
+
                     PacketReceived = false;     // Reset flag
-                    if((Buffer[0]=='C') && (Buffer[1]=='A') && (Buffer[2]=='D'))
-                    {
-                        PacketCnt = (Buffer[4] << 8) + Buffer[5];   // ID packet
-                        RxCorrectCnt++;         // Update RX counter
-#if(FULL_DBG)
-                        printf( "Rx Packet n %d\r\n", PacketCnt );
-#endif
-                    }
-                State = START_CAD;
+                    //State = START_CAD;
+                    //Radio.Rx( RX_TIMEOUT_VALUE );	//Basic RX code
+					//DelayMs(1);	//Basic RX code
+					State = LOWPOWER;
                 }
                 else
                 {
@@ -238,12 +309,14 @@ void prueba( void )
 #endif
                         RxTimeoutTimerIrqFlag = false;
                         TimerReset(&RxAppTimeoutTimer);	// Start the Rx's's Timer
-                        Radio.Rx( RX_TIMEOUT_VALUE );   // CAD is detected, Start RX
+                        //Radio.Rx( RX_TIMEOUT_VALUE );   // CAD is detected, Start RX
                     }
                     else
                     {
                         TimerStart(&CADTimeoutTimer);   // Start the CAD's Timer
                     }
+                    Radio.Rx( RX_TIMEOUT_VALUE );	//Basic RX code
+					DelayMs(1);	//Basic RX code
                     State = LOWPOWER;
                 }
                 break;
@@ -251,33 +324,13 @@ void prueba( void )
             case TX:
             {
                 printf("Send Packet n %d \r\n",PacketCnt);
-                txCounter = txCounter + 1;
                 // Send the next frame
-                Buffer[0] = 'H';
-                Buffer[1] = 'O';
-                Buffer[2] = 'L';
-                Buffer[3] = 'A';
-                Buffer[4] = ' ';
-                Buffer[5] = 'C';
-                Buffer[6] = 'O';
-                Buffer[7] = 'M';
-                Buffer[8] = 'M';
-                Buffer[9] = 'S';
-                Buffer[10] = PacketCnt>>8;
-                Buffer[11] = (uint8_t)PacketCnt ;
-
-                if( PacketCnt == 0xFFFF)
-                {
-                    PacketCnt = 0;
-                }
-                else
-                {
-                    PacketCnt ++;
-                }
+                txfunction();
+                tx_count = tx_count + 1;
                 //Send Frame
                 DelayMs( 1 );
-                Radio.Send( Buffer, 12 );
-                HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+                Radio.Send( Buffer, BUFFER_SIZE );
+                //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 
                 State = LOWPOWER;
                 break;
@@ -287,30 +340,40 @@ void prueba( void )
                 State = LOWPOWER;
                 break;
             }
-            case START_CAD:
+            /*case START_CAD:
             {
+            	//HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+            	cadCounter = cadCounter + 1;
                 i++;    // Update NbTryCnt
                 TimerStop(&RxAppTimeoutTimer);  // Stop the Rx's Timer
                 // Trace for debug
                 if(CadRx == CAD_FAIL)
                 {
+                	failCADCounter = failCADCounter + 1;
 #if(FULL_DBG)
                 printf("No CAD detected\r\n");
 #endif
                 }
                 CadRx = CAD_FAIL;           // Reset CAD flag
-                DelayMs(randr(10,500));     //Add a random delay for the PER test
+                //DelayMs(randr(10,500));     //Add a random delay for the PER test
 #if(FULL_DBG)
                 printf("CAD %d\r\n",i);
 #endif
                 Radio.StartCad( );          //StartCad Again
+                //Radio.Rx( 0 );	//Basic RX code
+				//DelayMs(1);	//Basic RX code
                 State = LOWPOWER;
             break;
-            }
+            }*/
             case LOWPOWER:
             default:
             	defaultCounter = defaultCounter + 1;
-                State = TX;
+                //State = RX;
+            	if (tx_non_stop == 1){
+            		State = TX;
+            	}else{
+            		State = RX;
+            	}
                 // Set low power
                 break;
         }
@@ -320,31 +383,27 @@ void prueba( void )
         Radio.IrqProcess( );
     }
 
-    //Result
-    Per =  100 - (((float)RxCorrectCnt / i) * 100);
-    printf("CAD Performance Result :\r\n");
-    printf("CAD SYMBOL = %d | Det_Peak = %d | Det_Min = %d \r\n",(int)pow(2,CAD_SYMBOL_NUM),CAD_DET_PEAK,CAD_DET_MIN);
-    printf("Nb try :%d \r\n",i);
-    printf("CAD detected : %d \r\nRX Correct : %d \r\n",channelActivityDetectedCnt,RxCorrectCnt);
-    printf("RSSI moy : %d dBm\r\nSNR moy : %d \r\n",RssiMoy,SnrMoy);
-//    printf("PER : %.1f \r\n",Per);
-    printf("Nb RxError :%d \r\nNb RxTimout : %d \r\nNbSymbolTimeout : %d \r\n",RxErrorCnt,RxTimeoutCnt,SymbTimeoutCnt);
-    printf("TEST END   \r\n \r\n");
+}
 
-    //Reset All results for next test
-    Per = 0.0;
-    RxCorrectCnt = 0;
-    channelActivityDetectedCnt = 0;
-    RxErrorCnt = 0;
-    RxTimeoutCnt = 0;
-    SymbTimeoutCnt = 0;
-    i=0;
+void txfunction( void ){
+	for (uint8_t i = 0; i<BUFFER_SIZE; i=i+1){
+		Buffer[i] = Memory[i+txCounter*BUFFER_SIZE];
+	}
+	txCounter = txCounter + 1;
+	if (MEMORY_SIZE < ( txCounter*BUFFER_SIZE + BUFFER_SIZE )){
+		txCounter = 0;
+		tx_non_stop = 0;
+	}
 }
 
 void OnTxDone( void )
 {
     Radio.Standby( );
-    State = TX;
+    if (tx_non_stop == 1){
+        State = TX;
+    } else{
+        State = LOWPOWER;
+    }
 }
 
 void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
@@ -352,12 +411,15 @@ void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
     Radio.Standby( );
     BufferSize = size;
     memcpy( Buffer, payload, BufferSize );
+    uint8_t RXactual[BufferSize];
+    memcpy( RXactual, payload, BufferSize );
     RssiValue = rssi;
     SnrValue = snr;
     PacketReceived = true;
     RssiMoy = (((RssiMoy * RxCorrectCnt) + RssiValue) / (RxCorrectCnt + 1));
     SnrMoy = (((SnrMoy * RxCorrectCnt) + SnrValue) / (RxCorrectCnt + 1));
     State = RX;
+    testRX = 1;
 }
 
 void OnTxTimeout( void )
@@ -375,9 +437,9 @@ void OnRxTimeout( void )
     }
     else
     {
-#if(FULL_DBG)
-        printf(".");
-#endif
+//#if(FULL_DBG)
+//        printf(".");
+//#endif
         Radio.Rx( RX_TIMEOUT_VALUE );   //  Restart Rx
         SymbTimeoutCnt++;               //  if we pass here because of Symbol Timeout
         State = LOWPOWER;
@@ -409,7 +471,9 @@ void SX126xConfigureCad( RadioLoRaCadSymbols_t cadSymbolNum, uint8_t cadDetPeak,
 {
     SX126xSetDioIrqParams( 	IRQ_CAD_DONE | IRQ_CAD_ACTIVITY_DETECTED, IRQ_CAD_DONE | IRQ_CAD_ACTIVITY_DETECTED,
                             IRQ_RADIO_NONE, IRQ_RADIO_NONE );
-    SX126xSetCadParams( cadSymbolNum, cadDetPeak, cadDetMin, LORA_CAD_ONLY, ((cadTimeout * 1000) / 15.625 ));
+    //SX126xSetCadParams( cadSymbolNum, cadDetPeak, cadDetMin, LORA_CAD_ONLY, ((cadTimeout * 1000) / 15.625 ));
+    SX126xSetCadParams( cadSymbolNum, cadDetPeak, cadDetMin, LORA_CAD_RX, ((cadTimeout * 1000) / 15.625 ));
+    //THE TOTAL CAD TIMEOUT CAN BE EQUAL TO RX TIMEOUT (IT SHALL NOT BE HIGHER THAN 4 SECONDS
 }
 
 static void CADTimeoutTimeoutIrq( void )

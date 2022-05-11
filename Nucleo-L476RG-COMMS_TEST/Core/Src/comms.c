@@ -1,44 +1,27 @@
-/*
- * comms.c
+/*!
+ * \file      comms.c
  *
- *  Created on: 23 feb. 2022
- *      Author: Daniel Herencia Ruiz
- */
-
-
-
-/*
- / _____)             _              | |
-( (____  _____ ____ _| |_ _____  ____| |__
- \____ \| ___ |    (_   _) ___ |/ ___)  _ \
- _____) ) ____| | | || |_| ____( (___| | | |
-(______/|_____)_|_|_| \__)_____)\____)_| |_|
-    (C)2013 Semtech
-
-Description: CAD performance evaluation test
-
-License: Revised BSD License, see LICENSE.TXT file include in the project
-
-Maintainer: Benjamin Boulet
-*/
-
-/*	THINGS TO REVISE IN THIS CODE
- * 	RF SWITCH connections are done on the opposite order
- * 	We have to program the DIO2 on the contrary
+ * \brief     Comms subsytem functions
  *
  *
  *
+ * \code
+ *
+ * 				 _______    ______    ____    ____    ____    ____     ______
+ * 				/ ______)  /  __  \  |    \  /    |  |    \  /    |   / _____)
+ * 			   / /         | |  | |  |  \  \/  /  |  |  \  \/  /  |  ( (____
+ *            ( (          | |  | |  |  |\    /|  |  |  |\    /|  |   \____ \
+ *             \ \______   | |__| |  |  | \__/ |  |  |  | \__/ |  |   _____) )
+ *              \_______)  \______/  |__|      |__|  |__|      |__|  (______/
  *
  *
+ * \endcode
+ *
+ * \author    Daniel Herencia
  *
  */
-
-
 
 #include "comms.h"
-
-
-
 
 typedef enum
 {
@@ -59,7 +42,6 @@ typedef enum
 }CadRx_t;
 
 
-
 uint16_t BufferSize = BUFFER_SIZE;
 uint8_t Buffer[BUFFER_SIZE];
 
@@ -68,9 +50,6 @@ States_t State = LOWPOWER;
 int8_t RssiValue = 0;
 int8_t SnrValue = 0;
 
-#if(RX_FW == TX_FW)
-    #error "Please define only one firmware."
-#endif
 CadRx_t CadRx = CAD_FAIL;
 bool PacketReceived = false;
 bool RxTimeoutTimerIrqFlag = false;
@@ -84,21 +63,94 @@ int8_t SnrMoy = 0;
 uint16_t txCounter = 0;
 uint8_t Memory[MEMORY_SIZE] = {'H','O','L','A',',','S','O','C',' ','E','L',' ','D',
     		'A','N','I','E','L',' ','D','E',' ','C','O','M','M','S','.','T','H','I',
-			'S',' ','I','S',' ','T','H','E',' ','1',' ','P','A','C','K','E','T','.',
-			'H','O','L','A',',','S','O','C',' ','E','L',' ','D',
+			'S',' ','I','S',' ','T','H','E',' ',
+
+			'1',' ','P','A','C','K','E','T','.','H','O','L','A',',','S','O','C',' ','E','L',' ','D',
 			'A','N','I','E','L',' ','D','E',' ','C','O','M','M','S','.','T','H','I',
+
 			'S',' ','I','S',' ','T','H','E',' ','2',' ','P','A','C','K','E','T','.',
+			'H','O','L','A',',','S','O','C',' ','E','L',' ','D','A','N','I','E','L',' ','D','E',' ',
+
+			'C','O','M','M','S','.','T','H','I','S',' ','I','S',' ','T','H','E',' ','3',' ','P','A','C','K','E','T','.',
 			'H','O','L','A',',','S','O','C',' ','E','L',' ','D',
+
 			'A','N','I','E','L',' ','D','E',' ','C','O','M','M','S','.','T','H','I',
-			'S',' ','I','S',' ','T','H','E',' ','3',' ','P','A','C','K','E','T','.',
-			'H','O','L','A',',','S','O','C',' ','E','L',' ','D',
-			'A','N','I','E','L',' ','D','E',' ','C','O','M','M','S','.','T','H','I',
-			'S',' ','I','S',' ','T','H','E',' ','4',' ','P','A','C','K','E','T','.',
-			'*','*','*','*','*','*','*','*','*','*','*','*','*','*','*','*','*','*',
+			'S',' ','I','S',' ','T','H','E',' ','4',' ','P','A','C','K','E','T','.','*','*','*','*',
+
+			'E','N','D','*','*','*','*','*','*','*','*','*','*','*',
 };
 
 uint8_t tx_non_stop = 1; //1 => yes ; 0 => not
 uint8_t testRX = false;
+
+
+/*
+ * To avoid the variables being erased if a reset occurs, we have to store them in the Flash memory
+ * Therefore, they have to be declared as a single-element array
+ */
+uint8_t count_packet[] = {1234};		//To count how many packets have been sent (maximum WINDOW_SIZE)
+uint8_t count_window[] = {5678};		//To count the window number
+uint8_t count_rtx[] = {9012};			//To count the number of retransmitted packets
+
+
+/**************************************************************************************
+ *                                                                                    *
+ * 	Function:  configuration		                                                  *
+ * 	--------------------                                                              *
+ * 	function to configure the transceiver and the transmission protocol parameters    *
+ *                                                                                    *
+ *  returns: nothing									                              *
+ *                                                                                    *
+ **************************************************************************************/
+
+void configuration(void){
+
+    Radio.Init( &RadioEvents );
+    Radio.SetChannel( RF_FREQUENCY );
+
+    Radio.SetTxConfig( MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
+                                   LORA_SPREADING_FACTOR, LORA_CODINGRATE,
+                                   LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
+                                   true, 0, 0, LORA_IQ_INVERSION_ON, 3000 );
+
+    Radio.SetRxConfig( MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
+                                   LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
+                                   LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
+                                   0, true, 0, 0, LORA_IQ_INVERSION_ON, true );
+    uint8_t count_packet1[] = {0};		//To count how many packets have been sent (maximum WINDOW_SIZE)
+    uint8_t count_window1[] = {0};		//To count the window number
+    uint8_t count_rtx1[] = {0};			//To count the number of retransmitted packets
+    uint8_t count_packet2[] = {4};		//To count how many packets have been sent (maximum WINDOW_SIZE)
+    uint8_t count_window2[] = {5};		//To count the window number
+    uint8_t count_rtx2[] = {6};			//To count the number of retransmitted packets
+
+    SX126xConfigureCad( CAD_SYMBOL_NUM,CAD_DET_PEAK,CAD_DET_MIN,CAD_TIMEOUT_MS);            // Configure the CAD
+
+    uint32_t provaa = 3;
+    uint32_t provaa2 = 0;
+    Write_Flash(0x08008200,&provaa,1);
+
+    DelayMs( 300 );
+    //Write_Flash( 0x08008200, &count_packet2, sizeof(count_packet));
+    DelayMs( 300 );
+    Write_Flash( COUNT_WINDOW_ADDR , &count_window2 , sizeof(count_window) );
+    DelayMs( 300 );
+    Write_Flash( COUNT_RTX_ADDR , &count_rtx2 , sizeof(count_rtx) );
+
+    DelayMs( 300 );
+    Read_Flash( 0x08008200 , &provaa2 , 1 );	//Read from Flash count_packet
+    DelayMs( 300 );
+    Read_Flash( COUNT_WINDOW_ADDR , &count_window1 , sizeof(count_window1) ); 	//Read from Flash count_window
+	DelayMs( 300 );
+	Read_Flash( COUNT_RTX_ADDR , &count_rtx1 , sizeof(count_rtx1) ); 			//Read from Flash count_rtx
+
+    DelayMs( 300 );
+    Read_Flash( 0x08008200 , &provaa2 , 1 );	//Read from Flash count_packet
+    DelayMs( 300 );
+    Read_Flash( COUNT_WINDOW_ADDR , &count_window1 , sizeof(count_window1) ); 	//Read from Flash count_window
+	DelayMs( 300 );
+	Read_Flash( COUNT_RTX_ADDR , &count_rtx1 , sizeof(count_rtx1) ); 			//Read from Flash count_rtx
+}
 
 /**
  * Main application entry point.
@@ -116,6 +168,32 @@ void prueba( void )
     uint16_t tx_count = 0;
 
     uint8_t MemoryRX[MEMORY_RX_SIZE] = {'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
+    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/'
+    };
+
+    uint8_t MemoryTX[MEMORY_RX_SIZE] = {'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
     		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
     		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
     		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
@@ -161,94 +239,29 @@ void prueba( void )
     TimerInit( &RxAppTimeoutTimer, RxTimeoutTimerIrq );
     TimerSetValue( &RxAppTimeoutTimer, RX_TIMER_TIMEOUT );
 
-    Radio.Init( &RadioEvents );
-    Radio.SetChannel( RF_FREQUENCY );
+    configuration();
 
-//#if defined( USE_MODEM_LORA )
+    Radio.StartCad( );          // do the config and lunch first CAD
 
-    Radio.SetTxConfig( MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
-                                   LORA_SPREADING_FACTOR, LORA_CODINGRATE,
-                                   LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
-                                   true, 0, 0, LORA_IQ_INVERSION_ON, 3000 );
-
-    Radio.SetRxConfig( MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
-                                   LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
-                                   LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
-                                   0, true, 0, 0, LORA_IQ_INVERSION_ON, true );
-/*
-#elif defined( USE_MODEM_FSK )
-
-    Radio.SetTxConfig( MODEM_FSK, TX_OUTPUT_POWER, FSK_FDEV, 0,
-                                  FSK_DATARATE, 0,
-                                  FSK_PREAMBLE_LENGTH, FSK_FIX_LENGTH_PAYLOAD_ON,
-                                  true, 0, 0, 0, 3000 );
-
-    Radio.SetRxConfig( MODEM_FSK, FSK_BANDWIDTH, FSK_DATARATE,
-                                  0, FSK_AFC_BANDWIDTH, FSK_PREAMBLE_LENGTH,
-                                  0, FSK_FIX_LENGTH_PAYLOAD_ON, 0, true,
-                                  0, 0,false, true );
-
-#else
-//    #error "Please define a frequency band in the compiler options."
-#endif
-*/
-
-    printf("\r\n=============================\r\n");
-    printf("SX126X Cad Performance starts\r\n");
-    printf("=============================\r\n\r\n");
-#if(RX_FW == 1)
-    SX126xConfigureCad( CAD_SYMBOL_NUM,
-                        CAD_DET_PEAK,CAD_DET_MIN,
-                        CAD_TIMEOUT_MS);            // Configure the CAD
-                        Radio.StartCad( );          // do the config and lunch first CAD
-#if(FULL_DBG)
-    printf("CAD\r\n");
-#endif
-#else
-    State = TX;
-#endif
-    State = TX;
+    //State = TX;
 
     while(  i < NB_TRY )
     {
 		//DelayMs( 300 );
     	bucleCounter = bucleCounter + 1;
-    	/*
-    	printf("Send Packet n %d \r\n",PacketCnt);
-		txCounter = txCounter + 1;
-		// Send the next frame
-		Buffer[0] = 'C';
-		Buffer[1] = 'A';
-		Buffer[2] = 'D';
-		Buffer[3] = '0';
-		Buffer[4] = PacketCnt>>8;
-		Buffer[5] = (uint8_t)PacketCnt ;
 
-		if( PacketCnt == 0xFFFF)
-		{
-			PacketCnt = 0;
-		}<
-		else
-		{
-			PacketCnt ++;
-		}
-		//Send Frame
-		DelayMs( 100 );
-		Radio.Send( Buffer, 6 );
-		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-		DelayMs( 300 );*/
     	if (tx_non_stop == 1){
         	DelayMs( 300 );
     	}else{
     		DelayMs( 1 );
     	}
+    	//NO SE RX EL PRIMER PAQUETE EN EL CUBECELL. El ultimo no se recive en el stm32
+        Radio.IrqProcess( );
+
         switch( State )
         {
             case RX_TIMEOUT:
             {
-#if(FULL_DBG)
-                printf( "RX Timeout\r\n");
-#endif
                 RxTimeoutCnt++;
                 //State = START_CAD;
                 //Radio.Rx( RX_TIMEOUT_VALUE );	//Basic RX code
@@ -259,9 +272,6 @@ void prueba( void )
             }
             case RX_ERROR:
             {
-#if(FULL_DBG)
-                printf( "RX Error\r\n");
-#endif
                 RxErrorCnt++;
                 PacketReceived = false;
                 //State = START_CAD;
@@ -276,22 +286,20 @@ void prueba( void )
             	//HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
                 if( PacketReceived == true )
                 {
-                	if (testRX == 1){
-                		test_counter = test_counter + 1;
-            			for (uint8_t i=0; i<BUFFER_SIZE; i++){
-            				MemoryRX[i + rxCounter*BUFFER_SIZE] = Buffer[i];
-            			}
-            			rxCounter = rxCounter + 1;
-            			if (MEMORY_RX_SIZE < ( rxCounter*BUFFER_SIZE + BUFFER_SIZE )){
-            				rxCounter = 0;
-            			}
-            			testRX = 0;
-            			if (Buffer[0] == 'T' && Buffer[1] == 'X'){
-            				//txNonStop = true;
-            				//txNonStopNum = 1;
-            				tx_non_stop = 1;
-            			}
-                	}
+					test_counter = test_counter + 1;
+					for (uint8_t i=0; i<BUFFER_SIZE; i++){
+						MemoryRX[i + rxCounter*BUFFER_SIZE] = Buffer[i];
+					}
+					rxCounter = rxCounter + 1;
+					if (MEMORY_RX_SIZE < ( rxCounter*BUFFER_SIZE + BUFFER_SIZE )){
+						rxCounter = 0;
+					}
+					if (Buffer[0] == 'T' && Buffer[1] == 'X'){
+						//txNonStop = true;
+						//txNonStopNum = 1;
+						tx_non_stop = 1;
+						DelayMs(1000);
+					}
 
                     PacketReceived = false;     // Reset flag
                     //State = START_CAD;
@@ -304,9 +312,6 @@ void prueba( void )
                     if (CadRx == CAD_SUCCESS)
                     {
                         channelActivityDetectedCnt++;   // Update counter
-#if(FULL_DBG)
-                        printf( "Rxing\r\n");
-#endif
                         RxTimeoutTimerIrqFlag = false;
                         TimerReset(&RxAppTimeoutTimer);	// Start the Rx's's Timer
                         //Radio.Rx( RX_TIMEOUT_VALUE );   // CAD is detected, Start RX
@@ -323,13 +328,18 @@ void prueba( void )
             }
             case TX:
             {
-                printf("Send Packet n %d \r\n",PacketCnt);
                 // Send the next frame
                 txfunction();
-                tx_count = tx_count + 1;
                 //Send Frame
                 DelayMs( 1 );
                 Radio.Send( Buffer, BUFFER_SIZE );
+                for (uint8_t i = 0; i<BUFFER_SIZE; i=i+1){
+                	MemoryTX[i+tx_count*BUFFER_SIZE] = Buffer[i];
+				}
+                tx_count = tx_count + 1;
+                if (tx_count*BUFFER_SIZE>MEMORY_RX_SIZE){
+                	tx_count = 0;
+                }
                 //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 
                 State = LOWPOWER;
@@ -380,7 +390,7 @@ void prueba( void )
 
         TimerLowPowerHandler( );
         // Process Radio IRQ
-        Radio.IrqProcess( );
+        //Radio.IrqProcess( );
     }
 
 }
@@ -437,9 +447,6 @@ void OnRxTimeout( void )
     }
     else
     {
-//#if(FULL_DBG)
-//        printf(".");
-//#endif
         Radio.Rx( RX_TIMEOUT_VALUE );   //  Restart Rx
         SymbTimeoutCnt++;               //  if we pass here because of Symbol Timeout
         State = LOWPOWER;
@@ -472,18 +479,19 @@ void SX126xConfigureCad( RadioLoRaCadSymbols_t cadSymbolNum, uint8_t cadDetPeak,
     SX126xSetDioIrqParams( 	IRQ_CAD_DONE | IRQ_CAD_ACTIVITY_DETECTED, IRQ_CAD_DONE | IRQ_CAD_ACTIVITY_DETECTED,
                             IRQ_RADIO_NONE, IRQ_RADIO_NONE );
     //SX126xSetCadParams( cadSymbolNum, cadDetPeak, cadDetMin, LORA_CAD_ONLY, ((cadTimeout * 1000) / 15.625 ));
-    SX126xSetCadParams( cadSymbolNum, cadDetPeak, cadDetMin, LORA_CAD_RX, ((cadTimeout * 1000) / 15.625 ));
-    //THE TOTAL CAD TIMEOUT CAN BE EQUAL TO RX TIMEOUT (IT SHALL NOT BE HIGHER THAN 4 SECONDS
+    SX126xSetCadParams( cadSymbolNum, cadDetPeak, cadDetMin, LORA_CAD_RX, ((cadTimeout * 15.625) / 1000 ));
+    //THE TOTAL CAD TIMEOUT CAN BE EQUAL TO RX TIMEOUT (IT SHALL NOT BE HIGHER THAN 4 SECONDS)
 }
 
 static void CADTimeoutTimeoutIrq( void )
 {
     Radio.Standby( );
-    State = START_CAD;
+    State = LOWPOWER;
+    //State = START_CAD;
+    //State = RX;
 }
 
 static void RxTimeoutTimerIrq( void )
 {
     RxTimeoutTimerIrqFlag = true;
 }
-

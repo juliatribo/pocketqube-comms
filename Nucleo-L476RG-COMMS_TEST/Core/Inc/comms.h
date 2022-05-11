@@ -22,6 +22,8 @@
 #include "radio.h"
 #include "sx126x-board.h"
 
+#include "flash.h"
+
 
 
 //#if defined( USE_BAND_868 )
@@ -99,7 +101,7 @@ TimerEvent_t RxAppTimeoutTimer;
 
 //CAD parameters
 #define CAD_SYMBOL_NUM          LORA_CAD_02_SYMBOL
-#define CAD_DET_PEAK            22
+#define CAD_DET_PEAK            20
 #define CAD_DET_MIN             10
 #define CAD_TIMEOUT_MS          2000
 #define NB_TRY                  10
@@ -180,6 +182,8 @@ void DisplayCadRssivsTime( void );
 void prueba( void );
 
 void txfunction( void );
+
+void configuration(void);
 
 
 

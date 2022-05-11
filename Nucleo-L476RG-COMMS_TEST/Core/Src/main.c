@@ -85,7 +85,8 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+
+	HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -106,8 +107,29 @@ int main(void)
   MX_RTC_Init();
   MX_SPI2_Init();
   MX_UART4_Init();
-  /* USER CODE BEGIN 2 */
 
+  /* USER CODE BEGIN 2 */
+  uint64_t provaa = 0xFF;
+  uint64_t provaa1[4] = {100,60,26,46};
+  uint64_t provaa2 = 0;
+  uint64_t provaa3[4] = {0,0,0,0};
+  uint64_t prova4 = 0;
+  //Write_Flash(0x08004000,&provaa,1);
+  Write_Flash(CURRENT_STATE_ADDR,&provaa,sizeof(provaa));
+  DelayMs( 300 );
+  /*Write_Flash(CURRENT_STATE_ADDR+0x4000,&provaa,1);
+  DelayMs( 300 );
+  Write_Flash(CURRENT_STATE_ADDR+0x8000,&provaa,1);
+  DelayMs( 300 );*/
+  Write_Flash(0x08008010,&provaa1,sizeof(provaa1));
+  DelayMs( 300 );
+  Read_Flash(PREVIOUS_STATE_ADDR,&provaa3,sizeof(provaa3));
+  DelayMs( 300 );
+  Read_Flash(CURRENT_STATE_ADDR,&provaa2,sizeof(provaa2));
+  DelayMs( 300 );
+  Read_Flash(0x08008001,&prova4,sizeof(prova4));
+
+  //Read_Flash(CURRENT_STATE_ADDR,&provaa2,1 );
   /* USER CODE END 2 */
 
   /* Infinite loop */

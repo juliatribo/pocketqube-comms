@@ -94,7 +94,7 @@ static uint32_t Get_Bank(uint32_t Addr)
 //}
 
 //return bank;
-    return FLASH_BANK_1;//L431 only has FLASH_BANK_1
+    return FLASH_BANK_1;//L431 only has FLASH_BANK_1 REVISE THIS LINE!!!!!!!!!!!!!!!!!!
 }
 
 /**************************************************************************************
@@ -110,8 +110,7 @@ static uint32_t Get_Bank(uint32_t Addr)
  *  returns: Nothing or error in case it fails			                              *
  *                                                                                    *
  **************************************************************************************/
-uint32_t Flash_Write_Data(uint32_t StartSectorAddress, uint8_t *Data,
-		uint16_t numberofbytes) {
+uint32_t Flash_Write_Data(uint32_t StartSectorAddress, uint64_t *Data, uint16_t numberofbytes) {
 
 	static FLASH_EraseInitTypeDef EraseInitStruct;
 	uint32_t PAGEError;
@@ -130,10 +129,12 @@ uint32_t Flash_Write_Data(uint32_t StartSectorAddress, uint8_t *Data,
 	uint32_t Addr = FirstAddr;
 	uint32_t N_ADDR = 50;
 	uint32_t LastAddr = FirstAddr+N_ADDR;
-	uint8_t DataSave[PAGESIZE];
+	uint64_t DataSave[PAGESIZE];
 	uint8_t i = 0,j=0;
+	Data = *(__IO uint64_t*)Addr;
+	/*
 	while(Addr < LastAddr){
-		/* Verify if Addr is the Address where we want to write */
+		// Verify if Addr is the Address where we want to write
 		if (Addr == StartSectorAddress){
 			// We add the data array to DataSave
 			while(j<numberofbytes){
@@ -143,12 +144,12 @@ uint32_t Flash_Write_Data(uint32_t StartSectorAddress, uint8_t *Data,
 				Addr++;
 			}
 		}else{
-			DataSave[i] = *(__IO uint8_t*)Addr;
+			DataSave[i] = *(__IO uint64_t*)Addr;
 			i++;
 			Addr = Addr+1;
 		}
 	}
-
+	*/
 	 /* Clear OPTVERR bit set on virgin samples */
 	 //__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_OPTVERR);
 	  __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR | FLASH_FLAG_SIZERR | FLASH_FLAG_OPTVERR | FLASH_FLAG_PGSERR | FLASH_FLAG_PROGERR | FLASH_FLAG_BSY);
@@ -214,13 +215,12 @@ uint32_t Flash_Write_Data(uint32_t StartSectorAddress, uint8_t *Data,
  *  returns: Nothing									                              *
  *                                                                                    *
  **************************************************************************************/
-void Write_Flash(uint32_t StartSectorAddress, uint8_t *Data,
-		uint16_t numberofbytes) {
+void Write_Flash(uint32_t StartSectorAddress, uint64_t *Data, uint16_t numberofbytes) {
 	if (StartSectorAddress >= 0x08000000 && StartSectorAddress <= 0x0800BFFF) { //addresses with redundancy
 	// The addresses are separated 0x4000 positions
 		Flash_Write_Data(StartSectorAddress, Data, numberofbytes);
-		Flash_Write_Data(StartSectorAddress + 0x4000, Data, numberofbytes);
-		Flash_Write_Data(StartSectorAddress + 0x8000, Data, numberofbytes);
+		//Flash_Write_Data(StartSectorAddress + 0x4000, Data, numberofbytes);
+		//Flash_Write_Data(StartSectorAddress + 0x8000, Data, numberofbytes);
 		//Flash_Write_Data(StartSectorAddress + 0x0040, Data, numberofbytes);
 		//Flash_Write_Data(StartSectorAddress + 0x0080, Data, numberofbytes);
 	} else {
@@ -241,10 +241,9 @@ void Write_Flash(uint32_t StartSectorAddress, uint8_t *Data,
  *  returns: Nothing									                              *
  *                                                                                    *
  **************************************************************************************/
-void Flash_Read_Data(uint32_t StartSectorAddress, uint8_t *RxBuf,
-		uint16_t numberofbytes) {
+void Flash_Read_Data(uint32_t StartSectorAddress, uint64_t *RxBuf, uint16_t numberofbytes) {
 	while (1) {
-		*RxBuf = *(__IO uint8_t*) StartSectorAddress;
+		*RxBuf = *(__IO uint64_t*) StartSectorAddress;
 		StartSectorAddress += 1;	//perque += 1 ????
 		RxBuf++;
 		numberofbytes--;
@@ -269,8 +268,8 @@ void Flash_Read_Data(uint32_t StartSectorAddress, uint8_t *RxBuf,
  *  returns: Nothing									                              *
  *                                                                                    *
  **************************************************************************************/
-void Check_Redundancy(uint32_t Address, uint8_t *RxDef, uint16_t numberofbytes) {
-	uint8_t lect1[numberofbytes], lect2[numberofbytes], lect3[numberofbytes];
+void Check_Redundancy(uint32_t Address, uint64_t *RxDef, uint16_t numberofbytes) {
+	uint64_t lect1[numberofbytes], lect2[numberofbytes], lect3[numberofbytes];
 	Flash_Read_Data(Address, lect1, numberofbytes);
 	Flash_Read_Data(Address + 0x4000, lect2, numberofbytes);
 	Flash_Read_Data(Address + 0x8000, lect3, numberofbytes);
@@ -310,8 +309,7 @@ void Check_Redundancy(uint32_t Address, uint8_t *RxDef, uint16_t numberofbytes) 
  *  returns: Nothing									                              *
  *                                                                                    *
  **************************************************************************************/
-void Read_Flash(uint32_t StartSectorAddress, uint8_t *RxBuf,
-		uint16_t numberofbytes) {
+void Read_Flash(uint32_t StartSectorAddress, uint64_t *RxBuf, uint16_t numberofbytes) {
 	Flash_Read_Data(StartSectorAddress, RxBuf, numberofbytes);
 /*
 	if (StartSectorAddress >= 0x08000000 && StartSectorAddress <= 0x0800BFFF) { //addresses with redundancy

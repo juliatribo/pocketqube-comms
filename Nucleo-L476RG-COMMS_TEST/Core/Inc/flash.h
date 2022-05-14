@@ -21,9 +21,9 @@
 #define INIT_ADDR_TEST				0x08000800
 
 #define PHOTO_ADDR 					0x08020000
-//#define PAYLOAD_STATE_ADDR 		0x08008000
-//#define COMMS_STATE_ADDR 			0x08008001
-//#define DETUMBLE_STATE_ADDR 		0x08008004
+#define PAYLOAD_STATE_ADDR 			0x08008000	//CHECK THIS => IS THE SAME AS CURRENT_STATE_ADDRESS
+#define COMMS_STATE_ADDR 			0x08008001
+#define DETUMBLE_STATE_ADDR 		0x08008004
 #define CURRENT_STATE_ADDR			0x08008000
 #define PREVIOUS_STATE_ADDR			0x08008001
 #define DEPLOYMENT_STATE_ADDR 		0x08008002
@@ -48,7 +48,7 @@
 #define INTEGRATION_TIME_ADDR 		0x0800801C
 
 #define TLE_ADDR 					0x08008020 // 138 bytes
-//#define EXIT_LOW_POWER_FLAG_ADDR 	0x080080AA
+#define EXIT_LOW_POWER_FLAG_ADDR 	0x080080AA
 
 //CALIBRATION ADDRESSES
 #define CALIBRATION_ADDR			0x080080AB
@@ -74,17 +74,19 @@
 #define COUNT_WINDOW_ADDR 			0x08008201
 #define COUNT_RTX_ADDR 				0x08008202
 
+#define TEST_ADDRESS 				0x0800D000
 
 
-uint32_t Flash_Write_Data (uint32_t StartSectorAddress, uint8_t *Data, uint16_t numberofbytes);
 
-void Write_Flash(uint32_t StartSectorAddress, uint8_t *Data, uint16_t numberofbytes);
+uint32_t Flash_Write_Data (uint32_t StartSectorAddress, uint64_t *Data, uint16_t numberofbytes);
 
-void Flash_Read_Data (uint32_t StartSectorAddress, uint8_t *RxBuf, uint16_t numberofbytes);
+void Write_Flash(uint32_t StartSectorAddress, uint64_t *Data, uint16_t numberofbytes);
 
-void Check_Redundancy(uint32_t Address, uint8_t *RxDef, uint16_t numberofbytes);
+void Flash_Read_Data (uint32_t StartSectorAddress, uint64_t *RxBuf, uint16_t numberofbytes);
 
-void Read_Flash(uint32_t StartSectorAddress, uint8_t *RxBuf, uint16_t numberofbytes);
+void Check_Redundancy(uint32_t Address, uint64_t *RxDef, uint16_t numberofbytes);
+
+void Read_Flash(uint32_t StartSectorAddress, uint64_t *RxBuf, uint16_t numberofbytes);
 
 #endif /* INC_FLASH_H_ */
 

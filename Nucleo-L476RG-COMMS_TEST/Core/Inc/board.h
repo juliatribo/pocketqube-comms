@@ -61,7 +61,7 @@ Maintainer: Miguel Luis and Gregory Cristian
 #define RADIO_BUSY                                  PA_8//PB_3
 #define RADIO_DIO_1                                 PA_10//PB_4
 
-#define ANT_SWITCH_POWER                            PA_9	//Check this lines
+#define ANT_SWITCH_POWER                            PC_8//PA_9	//Check this lines
 
 #define OSC_LSE_IN                                  PC_14
 #define OSC_LSE_OUT                                 PC_15
@@ -78,12 +78,12 @@ Maintainer: Miguel Luis and Gregory Cristian
 #define UART_TX                                     PC_10//PA_2
 #define UART_RX                                     PC_11//PA_3
 
-#define LED_1                                       PC_1	//Check this lines
-#define LED_2                                       PC_0	//Check this lines
+#define LED_1                                       PC_7//PC_1	//Check this lines
+#define LED_2                                       P_6//PC_0	//Check this lines
 
-#define FR                                          PA_1	//Check this lines NOT USED
-#define OPT                                         PB_0	//Check this lines NOT USED
-#define DEVICE_SEL                                  PA_4	//Check this lines
+#define FR                                          PA_12//PA_1	//Check this lines NOT USED
+#define OPT                                         PA_11//PB_0	//Check this lines NOT USED
+#define DEVICE_SEL                                  PB_9//PA_4	//Check this lines
 
 /*!
  * LED GPIO pins objects

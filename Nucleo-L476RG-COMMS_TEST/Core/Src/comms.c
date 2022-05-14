@@ -84,13 +84,37 @@ uint8_t tx_non_stop = 1; //1 => yes ; 0 => not
 uint8_t testRX = false;
 
 
+
+uint8_t calib_packets = 0;			//Counter of the calibration packets received
+uint8_t tle_packets = 0;			//Counter of the tle packets received
+uint8_t telemetry_packets = 0;		//Counter of telemetry packets sent
+
+
 /*
  * To avoid the variables being erased if a reset occurs, we have to store them in the Flash memory
  * Therefore, they have to be declared as a single-element array
  */
-uint8_t count_packet[] = {1234};		//To count how many packets have been sent (maximum WINDOW_SIZE)
-uint8_t count_window[] = {5678};		//To count the window number
-uint8_t count_rtx[] = {9012};			//To count the number of retransmitted packets
+uint8_t count_packet[] = {0};		//To count how many packets have been sent (maximum WINDOW_SIZE)
+uint8_t count_window[] = {0};		//To count the window number
+uint8_t count_rtx[] = {0};			//To count the number of retransmitted packets
+
+uint8_t i = 0;						//variable for loops
+uint8_t j=0;						//variable for loops
+uint8_t k=0;						//variable for loops
+
+uint64_t ack;						//Information rx in the ACK (0 => ack, 1 => nack)
+uint8_t nack_number;				//Number of the current packet to retransmit
+bool nack;							//True when retransmission necessary
+bool full_window;					//Stop & wait => to know when we reach the limit packet of the window
+bool statemach = true;				//If true, comms workflow follows the state machine. This value should be controlled by OBC
+									//Put true before activating the statemachine thread. Put false before ending comms thread
+
+
+bool send_data = false;				//If true, the state machine send packets every airtime
+bool send_telemetry = false;		//If true, we have to send telemetry packets instead of payload data
+uint8_t num_telemetry = 0;			//Total of telemetry packets that have to be sent (computed when telecomand send telemetry received)
+bool contingency = false;			//True if we are in contingency state => only receive
+
 
 
 /**************************************************************************************
@@ -126,30 +150,32 @@ void configuration(void){
 
     SX126xConfigureCad( CAD_SYMBOL_NUM,CAD_DET_PEAK,CAD_DET_MIN,CAD_TIMEOUT_MS);            // Configure the CAD
 
+    /*
     uint32_t provaa = 3;
     uint32_t provaa2 = 0;
-    Write_Flash(0x08008200,&provaa,1);
+    //Write_Flash(0x08008200,&provaa,1);
 
     DelayMs( 300 );
     //Write_Flash( 0x08008200, &count_packet2, sizeof(count_packet));
     DelayMs( 300 );
-    Write_Flash( COUNT_WINDOW_ADDR , &count_window2 , sizeof(count_window) );
+    //Write_Flash( COUNT_WINDOW_ADDR , &count_window2 , sizeof(count_window) );
     DelayMs( 300 );
-    Write_Flash( COUNT_RTX_ADDR , &count_rtx2 , sizeof(count_rtx) );
+    //Write_Flash( COUNT_RTX_ADDR , &count_rtx2 , sizeof(count_rtx) );
 
     DelayMs( 300 );
-    Read_Flash( 0x08008200 , &provaa2 , 1 );	//Read from Flash count_packet
+    //Read_Flash( 0x08008200 , &provaa2 , 1 );	//Read from Flash count_packet
     DelayMs( 300 );
-    Read_Flash( COUNT_WINDOW_ADDR , &count_window1 , sizeof(count_window1) ); 	//Read from Flash count_window
+    //Read_Flash( COUNT_WINDOW_ADDR , &count_window1 , sizeof(count_window1) ); 	//Read from Flash count_window
 	DelayMs( 300 );
-	Read_Flash( COUNT_RTX_ADDR , &count_rtx1 , sizeof(count_rtx1) ); 			//Read from Flash count_rtx
+	//Read_Flash( COUNT_RTX_ADDR , &count_rtx1 , sizeof(count_rtx1) ); 			//Read from Flash count_rtx
 
     DelayMs( 300 );
-    Read_Flash( 0x08008200 , &provaa2 , 1 );	//Read from Flash count_packet
+    //Read_Flash( 0x08008200 , &provaa2 , 1 );	//Read from Flash count_packet
     DelayMs( 300 );
-    Read_Flash( COUNT_WINDOW_ADDR , &count_window1 , sizeof(count_window1) ); 	//Read from Flash count_window
+    //Read_Flash( COUNT_WINDOW_ADDR , &count_window1 , sizeof(count_window1) ); 	//Read from Flash count_window
 	DelayMs( 300 );
-	Read_Flash( COUNT_RTX_ADDR , &count_rtx1 , sizeof(count_rtx1) ); 			//Read from Flash count_rtx
+	//Read_Flash( COUNT_RTX_ADDR , &count_rtx1 , sizeof(count_rtx1) ); 			//Read from Flash count_rtx
+	*/
 }
 
 /**
@@ -495,3 +521,151 @@ static void RxTimeoutTimerIrq( void )
 {
     RxTimeoutTimerIrqFlag = true;
 }
+
+
+/**************************************************************************************
+ *                                                                                    *
+ * 	Function:  process_telecommand                                                    *
+ * --------------------                                                               *
+ * 	processes the information contained in the packet depending on the telecommand    *
+ * 	received																	      *
+ *                                                                                    *
+ *  header: number of telecommand			                                          *
+ *  info: information contained in the received packet								  *
+ *                                                                                    *
+ *  returns: nothing									                              *
+ *                                                                                    *
+ **************************************************************************************/
+void process_telecommand(uint8_t header, uint8_t info) {
+	switch(header) {
+	case RESET2:
+		HAL_NVIC_SystemReset();
+		break;
+	case NOMINAL:
+		Write_Flash(NOMINAL_ADDR, &info, 1);
+		break;
+	case LOW:
+		Write_Flash(LOW_ADDR, &info, 1);
+		break;
+	case CRITICAL:
+		Write_Flash(CRITICAL_ADDR, &info, 1);
+		break;
+	case EXIT_LOW_POWER:{
+		Write_Flash(EXIT_LOW_POWER_FLAG_ADDR, &info, 1);
+		Write_Flash(EXIT_LOW_ADDR, TRUE, 1);
+		break;
+	}
+	case SET_TIME:{
+		uint8_t time[4];
+		for (k=0; k<4; k++){
+			time[k]=Buffer[k+1];
+		}
+		Write_Flash(TEMP_ADDR, &time, sizeof(time));
+		break;
+	}
+	case SET_CONSTANT_KP:
+		Write_Flash(KP_ADDR, &info, 1);
+		break;
+	case TLE:{
+		uint8_t tle[UPLINK_BUFFER_SIZE-1];
+		for (k=1; k<UPLINK_BUFFER_SIZE; k++){
+			tle[k-1]=Buffer[k];
+		}
+		Write_Flash(TLE_ADDR + tle_packets*UPLINK_BUFFER_SIZE, &tle, sizeof(tle));
+		tle_packets++;
+		uint8_t integer_part = (uint8_t) 138/UPLINK_BUFFER_SIZE;
+		if (tle_packets == integer_part+1){
+			tle_packets = 0;
+		}
+		break;
+	}
+	case SET_GYRO_RES:
+		/*4 possibles estats, rebrem 00/01/10/11*/
+		Write_Flash(GYRO_RES_ADDR, &info, 1);
+		break;
+	case SEND_DATA:{
+		if (!contingency){
+			State = TX;
+			send_data = true;
+		}
+		break;
+	}
+	case SEND_TELEMETRY:{
+		if (!contingency){
+			send_telemetry = true;
+			num_telemetry = (uint8_t) 34/BUFFER_SIZE + 1; //cast to integer to erase the decimal part
+			State = TX;
+		}
+		break;
+	}
+	case STOP_SENDING_DATA:{
+		send_data = false;
+		count_packet[0] = 0;
+		break;
+	}
+	case ACK_DATA:{
+		//check it
+	 	 ack = ack & Buffer[1];
+		 for(j=2; j<ACK_PAYLOAD_LENGTH; j++){
+			 ack = (ack << 8*j) & Buffer[j];
+		 }
+		 count_window[0] = 0;
+		 full_window = false;
+		 if (ack != 0xFFFFFFFFFFFFFFFF){
+			 nack = true;
+		 }
+		 State = TX;
+		break;
+	}
+	case SET_SF_CR: {
+		uint8_t SF;
+		if (info == 0) SF = 7;
+		else if (info == 1) SF = 8;
+		else if (info == 2) SF = 9;
+		else if (info == 3) SF = 10;
+		else if (info == 4) SF = 11;
+		else if (info == 5) SF = 12;
+		Write_Flash(SF_ADDR, &SF, 1);
+		/*4 cases (4/5, 4/6, 4/7,1/2), so we will receive and store 0, 1, 2 or 3*/
+		Write_Flash(CRC_ADDR, &Buffer[2], 1);
+		break;
+	}
+	case SEND_CALIBRATION:{	//Rx calibration
+		uint8_t calib[UPLINK_BUFFER_SIZE-1];
+		for (k=1; k<UPLINK_BUFFER_SIZE; k++){
+			calib[k-1]=Buffer[k];
+		}
+		Write_Flash(CALIBRATION_ADDR, &calib, sizeof(calib));
+		calib_packets = calib_packets + 1;
+		uint8_t integer_part = (uint8_t) 138/UPLINK_BUFFER_SIZE;
+		if(calib_packets == integer_part+1){
+			calib_packets = 0;
+		}
+		break;
+	}
+	case TAKE_PHOTO:{
+		/*GUARDAR TEMPS FOTO?*/
+		Write_Flash(PAYLOAD_STATE_ADDR, TRUE, 1);
+		Write_Flash(PL_TIME_ADDR, &info, 4);
+		Write_Flash(PHOTO_RESOL_ADDR, &Buffer[5], 1);
+		Write_Flash(PHOTO_COMPRESSION_ADDR, &Buffer[6], 1);
+		break;
+	}
+	case TAKE_RF:{
+		Write_Flash(PAYLOAD_STATE_ADDR, TRUE, 1);
+		Write_Flash(PL_TIME_ADDR, &info, 8);
+		Write_Flash(F_MIN_ADDR, &Buffer[9], 1);
+		Write_Flash(F_MAX_ADDR, &Buffer[10], 1);
+		Write_Flash(DELTA_F_ADDR, &Buffer[11], 1);
+		Write_Flash(INTEGRATION_TIME_ADDR, &Buffer[12], 1);
+		break;
+	}
+	case SEND_CONFIG:{
+		uint8_t config[CONFIG_SIZE];
+		Read_Flash(CONFIG_ADDR, &config, CONFIG_SIZE);
+		Radio.Send( config, CONFIG_SIZE );
+		break;
+	}
+	}
+}
+

@@ -23,6 +23,7 @@
 #include "sx126x-board.h"
 
 #include "flash.h"
+#include "definitions.h"
 
 
 
@@ -106,6 +107,14 @@ TimerEvent_t RxAppTimeoutTimer;
 #define CAD_TIMEOUT_MS          2000
 #define NB_TRY                  10
 
+
+
+#define UPLINK_BUFFER_SIZE					15
+#define ACK_PAYLOAD_LENGTH					5			//ACK payload data length
+#define CONFIG_SIZE		13
+
+
+
 /*!
  * Radio events function pointer
  */
@@ -184,6 +193,9 @@ void prueba( void );
 void txfunction( void );
 
 void configuration(void);
+
+void process_telecommand(uint8_t header, uint8_t info);
+
 
 
 

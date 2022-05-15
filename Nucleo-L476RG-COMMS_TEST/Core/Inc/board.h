@@ -79,7 +79,7 @@ Maintainer: Miguel Luis and Gregory Cristian
 #define UART_RX                                     PC_11//PA_3
 
 #define LED_1                                       PC_7//PC_1	//Check this lines
-#define LED_2                                       P_6//PC_0	//Check this lines
+#define LED_2                                       PC_6//PC_0	//Check this lines
 
 #define FR                                          PA_12//PA_1	//Check this lines NOT USED
 #define OPT                                         PA_11//PB_0	//Check this lines NOT USED

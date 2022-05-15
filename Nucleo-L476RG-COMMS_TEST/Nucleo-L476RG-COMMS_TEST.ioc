@@ -306,4 +306,3 @@ VP_TIM16_VS_ClockSourceINT.Mode=Enable_Timer
 VP_TIM16_VS_ClockSourceINT.Signal=TIM16_VS_ClockSourceINT
 board=NUCLEO-L476RG
 boardIOC=true
-isbadioc=false

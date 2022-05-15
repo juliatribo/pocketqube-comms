@@ -217,9 +217,9 @@ void prueba( void )
     	bucleCounter = bucleCounter + 1;
 
     	if (tx_non_stop == 1){
-    		HAL_Delay( 300 );
+    		DelayMs( 300 );
     	}else{
-    		HAL_Delay( 1 );
+    		DelayMs( 1 );
     	}
     	//NO SE RX EL PRIMER PAQUETE EN EL CUBECELL. El ultimo no se recive en el stm32
         Radio.IrqProcess( );
@@ -264,7 +264,7 @@ void prueba( void )
 						//txNonStop = true;
 						//txNonStopNum = 1;
 						tx_non_stop = 1;
-						HAL_Delay(1000);
+						DelayMs(1000);
 					}
 
                     PacketReceived = false;     // Reset flag
@@ -287,7 +287,7 @@ void prueba( void )
                         TimerStart(&CADTimeoutTimer);   // Start the CAD's Timer
                     }
                     Radio.Rx( RX_TIMEOUT_VALUE );	//Basic RX code
-                    HAL_Delay(1);	//Basic RX code
+                    DelayMs(1);	//Basic RX code
                     State = LOWPOWER;
                 }
                 break;
@@ -297,7 +297,7 @@ void prueba( void )
                 // Send the next frame
                 txfunction();
                 //Send Frame
-                HAL_Delay( 1 );
+                DelayMs( 1 );
                 Radio.Send( Buffer, BUFFER_SIZE );
                 for (uint8_t i = 0; i<BUFFER_SIZE; i=i+1){
                 	MemoryTX[i+tx_count*BUFFER_SIZE] = Buffer[i];

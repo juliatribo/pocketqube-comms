@@ -78,11 +78,11 @@
 
 
 
-uint32_t Flash_Write_Data (uint32_t StartSectorAddress, uint64_t *Data, uint16_t numberofbytes);
+uint32_t Flash_Write_Data(uint32_t Address, uint64_t *Data_write, uint16_t numberofbytes);
 
 void Write_Flash(uint32_t StartSectorAddress, uint64_t *Data, uint16_t numberofbytes);
 
-void Flash_Read_Data (uint32_t StartSectorAddress, uint64_t *RxBuf, uint16_t numberofbytes);
+void Flash_Read_Data(uint32_t Address, uint64_t *Data_read, uint16_t numberofbytes);
 
 void Check_Redundancy(uint32_t Address, uint64_t *RxDef, uint16_t numberofbytes);
 

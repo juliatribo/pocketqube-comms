@@ -4,11 +4,9 @@
  * \brief     It contains all the functions to read from / write in the flash memory
  *
  *
- * \created on: 15/11/2021
+ * \created on: 15/05/2022
  *
- * \author    Pol Simon
- *
- * \author    David Reiss
+ * \author    Daniel Herencia
  */
 
 #include "flash.h"
@@ -18,7 +16,7 @@
 
 /**************************************************************************************
  *                                                                                    *
- * Function:  GetSector                                                     		  *
+ * Function:  Get_Page 	                                                    		  *
  * --------------------                                                               *
  * Gets the page of a given address			        								  *
  *                                                                                    *
@@ -47,17 +45,15 @@ static uint32_t Get_Page(uint32_t Addr)
 
 /**************************************************************************************
  *                                                                                    *
- * Function:  FirstAddress                                                     		  *
+ * Function:  Get_Bank                        	                             		  *
  * --------------------                                                               *
- * defines the first address of a sector according to the reference manual	          *											  *
+ * brief Gets the bank of a given address       									  *											  *
  *                                                                                    *
- *  sector: Specific sector of a read/write function                                  *
+ *  Address: Specific address of a read/write function                                *
  *                                                                                    *
- *  returns: The first address corresponding to the sector	                          *
+ *  returns: The bank of a given address					                          *
  *                                                                                    *
  **************************************************************************************/
-
-
 
 /**
   * @brief Gets the bank of a given address
@@ -66,35 +62,10 @@ static uint32_t Get_Page(uint32_t Addr)
   */
 static uint32_t Get_Bank(uint32_t Addr)
 {
-  uint32_t bank = 0;
-
-//if (READ_BIT(SYSCFG->MEMRMP, SYSCFG_MEMRMP_FB_MODE) == 0)
-//{
-///* No Bank swap */
-//if (Addr <(FLASH_BASE + FLASH_BANK_SIZE))
-//{
-//bank = FLASH_BANK_1;
-//}
-//else
-//{
-//bank = FLASH_BANK_2;
-//}
-//}
-//else
-//{
-///* Bank swap */
-//if (Addr <(FLASH_BASE + FLASH_BANK_SIZE))
-//{
-//bank = FLASH_BANK_2;
-//}
-//else
-//{
-//bank = FLASH_BANK_1;
-//}
-//}
-
-//return bank;
-    return FLASH_BANK_1;//L431 only has FLASH_BANK_1 REVISE THIS LINE!!!!!!!!!!!!!!!!!!
+  if (Addr <(FLASH_BASE + FLASH_BANK_SIZE))
+	  return FLASH_BANK_1;
+  else
+	  return FLASH_BANK_2;
 }
 
 /**************************************************************************************
@@ -103,97 +74,76 @@ static uint32_t Get_Bank(uint32_t Addr)
  * --------------------                                                               *
  * Writes in the flash memory														  *
  *                                                                                    *
- *  StartSectorAddress: first address to be written		                              *
- *	Data: information to be stored in the FLASH/EEPROM memory						  *
+ *  Address: first address to be written		    		                          *
+ *	Data: information to be stored in the FLASH memory								  *
  *	numberofbytes: Data size in Bytes					    						  *
  *															                          *
  *  returns: Nothing or error in case it fails			                              *
  *                                                                                    *
  **************************************************************************************/
-uint32_t Flash_Write_Data(uint32_t StartSectorAddress, uint64_t *Data, uint16_t numberofbytes) {
+uint32_t Flash_Write_Data(uint32_t Address, uint64_t *Data_write, uint16_t numberofbytes) {
 
-	static FLASH_EraseInitTypeDef EraseInitStruct;
-	uint32_t PAGEError;
-	int sofar = 0;
-
-
+	uint32_t init_page = Get_Page( Address );
+	uint32_t finish_page = Get_Page( Address + 8*numberofbytes );
 	/* Unlock the Flash to enable the flash control register access *************/
 	HAL_FLASH_Unlock();
 
-	/* Erase the user Flash area */
+	//pensar que pasa cuando los datos a escribir ocupan varias paginas
+	//la segunda iteracion del while hay que revisarla, porque ahora escribe lo mismo que la primera
 
-	/* Get the number of sector to erase from 1st sector */
-	uint32_t StartSector = 0x08008000;
+	while(init_page <= finish_page){
+		//Safe last page
+		uint64_t Data_ans[PAGESIZE/8];
+		uint32_t page_start_add;
+		if (Address <(FLASH_BASE + FLASH_BANK_SIZE))
+			page_start_add = FLASH_BASE + PAGESIZE*init_page;
+		else
+			page_start_add = FLASH_BASE + FLASH_BANK_SIZE + PAGESIZE*init_page;
 
-	uint32_t FirstAddr = 0x08008000;
-	uint32_t Addr = FirstAddr;
-	uint32_t N_ADDR = 50;
-	uint32_t LastAddr = FirstAddr+N_ADDR;
-	uint64_t DataSave[PAGESIZE];
-	uint8_t i = 0,j=0;
-	Data = *(__IO uint64_t*)Addr;
-	/*
-	while(Addr < LastAddr){
-		// Verify if Addr is the Address where we want to write
-		if (Addr == StartSectorAddress){
-			// We add the data array to DataSave
-			while(j<numberofbytes){
-				DataSave[i] = Data[j];
-				i++;
-				j++;
-				Addr++;
-			}
-		}else{
-			DataSave[i] = *(__IO uint64_t*)Addr;
-			i++;
-			Addr = Addr+1;
-		}
-	}
-	*/
-	 /* Clear OPTVERR bit set on virgin samples */
-	 //__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_OPTVERR);
-	  __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR | FLASH_FLAG_SIZERR | FLASH_FLAG_OPTVERR | FLASH_FLAG_PGSERR | FLASH_FLAG_PROGERR | FLASH_FLAG_BSY);
-	/* Fill EraseInit structure*/
-	 /* Get the number of sector to erase from 1st sector*/
-	  EraseInitStruct.Banks = Get_Bank(StartSectorAddress);//Get the bank where the erase address is located
-	  EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;//Erase by page
-	  EraseInitStruct.Page = Get_Page(StartSectorAddress);//Get page position
-	  EraseInitStruct.NbPages = 1;//Erase 1 page
+		Flash_Read_Data(page_start_add,&Data_ans,PAGESIZE/8);
 
-	/* Note: If an erase operation in Flash memory also concerns data in the data or instruction cache,
-	 you have to make sure that these data are rewritten before they are accessed during code
-	 execution. If this cannot be done safely, it is recommended to flush the caches by setting the
-	 DCRST and ICRST bits in the FLASH_CR register. */
-	if (HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError) != HAL_OK) {
-		return HAL_FLASH_GetError();
-
-	}
-
-	/* Program the user Flash area word by word
-	 (area defined by FLASH_USER_START_ADDR and FLASH_USER_END_ADDR) ***********/
-//	while (sofar < numberofbytes) {
-//		uint8_t dd = Data[sofar];
-//		if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, StartSectorAddress,
-//				Data[sofar]) == HAL_OK) {
-//			StartSectorAddress += 1; // use StartPageAddress += 2 for half word and 8 for double word
-//			sofar++;
-//		} else {
-//			/* Error occurred while writing data in Flash memory*/
-//			return HAL_FLASH_GetError();
-//		}
-//	}
-
-	while (sofar < N_ADDR) {
-		if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FirstAddr,
-				DataSave[sofar]) == HAL_OK) {
-			FirstAddr += 8; // use StartPageAddress += 2 for half word and 8 for double word
-			sofar++;
-		} else {
-			/* Error occurred while writing data in Flash memory*/
+		//Erase Page
+		static FLASH_EraseInitTypeDef EraseInitStruct;
+		uint32_t PAGEError;
+		EraseInitStruct.Banks = Get_Bank( Address );//Bank where the erase address is located
+		EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;//Erase by page
+		EraseInitStruct.Page = Get_Page( Address );//Get page position
+		EraseInitStruct.NbPages = 1;//Erase 1 page
+		if (HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError) != HAL_OK) {
 			return HAL_FLASH_GetError();
 		}
-	}
 
+		uint32_t difference = (Address - page_start_add) / 8;
+
+
+		//Write new data
+		uint8_t bytes_write = numberofbytes;
+		uint32_t write_address = Address;
+		uint8_t position_wr = 0;
+
+		while(bytes_write > 0){
+			HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, write_address, Data_write[position_wr]);
+			write_address += 8;
+			bytes_write--;
+			position_wr++;
+		}//*/
+
+		//Write old data
+///*
+		uint16_t bytes_write2 = PAGESIZE / 8;
+		write_address = page_start_add;
+		uint16_t position_wr2 = 0;
+		while(bytes_write2 > 0){
+			if (write_address != Address && Data_ans[position_wr2] != 0xFFFFFFFFFFFFFFFF){
+				HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, write_address, Data_ans[position_wr2]);
+			}
+			write_address += 8;
+			bytes_write2--;
+			position_wr2++;
+		}//*/
+
+		init_page++;
+	}
 	/* Lock the Flash to disable the flash control register access (recommended
 	 to protect the FLASH memory against possible unwanted operation) *********/
 	HAL_FLASH_Lock();
@@ -234,22 +184,23 @@ void Write_Flash(uint32_t StartSectorAddress, uint64_t *Data, uint16_t numberofb
  * --------------------                                                               *
  * Reads from the flash memory														  *
  *                                                                                    *
- *  StartSectorAddress: first address to be read		                              *
- *	RxBuf: Where the data read from memory will be stored							  *
+ *  Address: first address to be read					                              *
+ *	Data_read: Where the data read from memory will be stored						  *
  *	numberofbytes: Reading data size in Bytes					    				  *
  *															                          *
  *  returns: Nothing									                              *
  *                                                                                    *
  **************************************************************************************/
-void Flash_Read_Data(uint32_t StartSectorAddress, uint64_t *RxBuf, uint16_t numberofbytes) {
-	while (1) {
-		*RxBuf = *(__IO uint64_t*) StartSectorAddress;
-		StartSectorAddress += 1;	//perque += 1 ????
-		RxBuf++;
-		numberofbytes--;
-		if (numberofbytes == 0)
-			break;
-	}
+void Flash_Read_Data(uint32_t Address, uint64_t *Data_read, uint16_t numberofbytes) {
+	uint16_t bytes_read = numberofbytes;
+	uint32_t read_address = Address;
+	uint8_t position_rd = 0;
+	while (bytes_read > 0) {
+		  Data_read[position_rd] = *(__IO uint64_t*) read_address;
+		  read_address += 8;
+		  bytes_read--;
+		  position_rd++;
+	  }
 }
 
 /**************************************************************************************

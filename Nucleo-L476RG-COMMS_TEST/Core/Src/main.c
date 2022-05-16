@@ -114,9 +114,80 @@ int main(void)
   MX_ADC1_Init();
   MX_DAC1_Init();
   /* USER CODE BEGIN 2 */
+  /*
+   * PROCEDURE TO WRITE IN FLASH:
+   * Read the whole page
+   * change the desired values in the variable read
+   * Erase the whole page
+   * Write the whole page
+   */
 
+  //HAL_FLASH_Unlock();
+  //Variables
+  uint64_t Wirten1[] = {0xABCDEFFECDBA1234,0xABCDEF1234567890,0xAAAAAAAABBBBBBBB,0xCCCCCCCCDDDDDDDD,
+		  	  	  	 0xCDFFAFABFEDCBAAA,0xABCDEF1234567890,0xAAAAAAAABBBBBBBB,0xCCCCCCCCDDDDDDDD};
+  uint64_t Data2 = 0xABCDEF1234567890;
+  uint32_t Address = 0x0800E800;
+  uint32_t Address2 = 0x0800E810;
+  //uint64_t Read[] = {0,0,0,0,0,0};
+  uint64_t Read[10];
+  uint64_t Read2 = 0;
+
+
+  //uint64_t Data_ans[256];
+  //Flash_Read_Data(Address,&Data_ans,256);
+  //uint64_t Data_ans2[256];
+  HAL_Delay(10);
+  uint16_t bytes_write = sizeof(Wirten1)/8;
+  Flash_Write_Data(Address2,&Wirten1,bytes_write);
+/*
+  uint16_t bytes_read = sizeof(Read)/8;
+  Flash_Read_Data(Address,&Read,bytes_read);*/
+
+
+  /*
+  //Erase
+  static FLASH_EraseInitTypeDef EraseInitStruct;
+  uint32_t PAGEError;
+  EraseInitStruct.Banks = FLASH_BANK_1;//Bank where the erase address is located
+  EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;//Erase by page
+  EraseInitStruct.Page = (Address-FLASH_BASE)/FLASH_PAGE_SIZE;//Get page position
+  EraseInitStruct.NbPages = 1;//Erase 1 page
+  if (HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError) != HAL_OK) {
+  		return HAL_FLASH_GetError();
+
+  }
+
+  //Write
+  uint16_t bytes_write = sizeof(Data)/8;
+  uint32_t write_address = Address;
+  uint8_t position_wr = 0;
+  while(bytes_write > 0){
+	  HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, write_address, Data[position_wr]);
+	  write_address += 8;
+	  bytes_write--;
+	  position_wr++;
+  }
+
+
+  HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Address2, Data2);
+
+  //Read
+  uint16_t bytes_read = sizeof(Read)/8;
+  Read2 = *(__IO uint64_t*) Address2;
+  uint32_t read_address = Address;
+  uint8_t position_rd = 0;
+
+  while (bytes_read > 0) {
+	  Read[position_rd] = *(__IO uint64_t*) read_address;
+	  read_address += 8;
+	  bytes_read--;
+	  position_rd++;
+  }
+
+  HAL_FLASH_Lock();
+  */
   //TIMER TESTING
-  //MAYBE THIS ONLY WORKS FOR NUCLEO, BECAUSE IS A PERIPHERIAL
   HAL_TIM_Base_Start_IT(&htim16);
 
 

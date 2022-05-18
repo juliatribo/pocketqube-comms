@@ -35,7 +35,9 @@
 #define LOW					03
 #define CRITICAL			04
 #define EXIT_LOW_POWER		05
-#define SET_TIME			06
+#define EXIT_SURVIVAL		06
+#define EXIT_SUNSAFE		07
+#define SET_TIME			0x08
 
 //#define NACKDATA  			08	/*If it is received if the GS do not receive all the segments of the data.
  	 	 	 	 	 	 	 	 //*The PQ will send since the last segment received correctly.*/
@@ -70,6 +72,11 @@
 
 
 #define SEND_CONFIG			50	//Send all configuration
+
+#define ACK					60
+
+#define PIN1 				200	//Pin to avoid hacking telecommands
+#define PIN2				157	//Second byte of the PIN
 
 
 

@@ -74,7 +74,7 @@
 #define COUNT_WINDOW_ADDR 			0x08008201
 #define COUNT_RTX_ADDR 				0x08008202
 
-#define TEST_ADDRESS 				0x0800D000
+#define TEST_ADDRESS 				0x0800E860
 
 
 
@@ -89,6 +89,7 @@ void Check_Redundancy(uint32_t Address, uint64_t *RxDef, uint16_t numberofbytes)
 void Read_Flash(uint32_t StartSectorAddress, uint64_t *RxBuf, uint16_t numberofbytes);
 
 #endif /* INC_FLASH_H_ */
+
 
 
 

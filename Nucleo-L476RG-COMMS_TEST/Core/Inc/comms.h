@@ -188,13 +188,15 @@ int8_t GetLastCadRssi( void );
 void DisplayCadRssivsTime( void );
 
 
-void prueba( void );
+void StateMachine( void );
 
 void txfunction( void );
 
 void configuration(void);
 
 void process_telecommand(uint8_t header, uint8_t info);
+
+bool pin_correct(uint8_t pin_1, uint8_t pin_2);
 
 
 

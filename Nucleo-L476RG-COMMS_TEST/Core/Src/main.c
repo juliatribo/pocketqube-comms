@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "definitions.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -127,19 +127,23 @@ int main(void)
   uint64_t Wirten1[] = {0xABCDEFFECDBA1234,0xABCDEF1234567890,0xAAAAAAAABBBBBBBB,0xCCCCCCCCDDDDDDDD,
 		  	  	  	 0xCDFFAFABFEDCBAAA,0xABCDEF1234567890,0xAAAAAAAABBBBBBBB,0xCCCCCCCCDDDDDDDD};
   uint64_t Data2 = 0xABCDEF1234567890;
-  uint32_t Address = 0x0800E800;
-  uint32_t Address2 = 0x0800E810;
+  uint32_t Address2 = 0x0800E860;
+  uint64_t variable1 = 0x8;
   //uint64_t Read[] = {0,0,0,0,0,0};
   uint64_t Read[10];
   uint64_t Read2 = 0;
+
+  uint8_t eight_bits = 0x3;
 
 
   //uint64_t Data_ans[256];
   //Flash_Read_Data(Address,&Data_ans,256);
   //uint64_t Data_ans2[256];
   HAL_Delay(10);
-  uint16_t bytes_write = sizeof(Wirten1)/8;
-  Flash_Write_Data(Address2,&Wirten1,bytes_write);
+  //Write_Flash(Address2,&variable1,bytes_write);
+  /*uint64_t eight_bytes = eight_bits;*/
+  /*uint16_t bytes_write = sizeof(eight_bytes)/8;*/
+  /*Flash_Write_Data(Address2,&eight_bytes,bytes_write);//THIS LINE WORKS*/
 /*
   uint16_t bytes_read = sizeof(Read)/8;
   Flash_Read_Data(Address,&Read,bytes_read);*/
@@ -292,7 +296,7 @@ int main(void)
   {
 	  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 	  HAL_Delay(1000);
-	  prueba();	//COMMS TEST FUNCTION
+	  StateMachine();	//COMMS FUNCTION
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

@@ -103,10 +103,42 @@ uint8_t Memory[MEMORY_SIZE] = {'H','O','L','A',',','S','O','C',' ','E','L',' ','
 uint8_t tx_non_stop = 1; //1 => yes ; 0 => not
 uint8_t testRX = false;
 
+
+/* FLAGS */
+uint8_t error_telecommand = false;
+uint8_t tle_telecommand = false;
+uint8_t tlecommand_rx = false;
+uint8_t tx_flag = false;
+uint8_t contact_GS = false; //To avoid TX beacon
+
+/* COUNTERS */
+uint8_t rtx_confirms = 0;	//Maximum 3 retransmissions of execution request
+
+// VARIABLES FROM OLD CODE
+uint8_t calib_packets = 0;			//Counter of the calibration packets received
+uint8_t tle_packets = 0;			//Counter of the tle packets received
+uint8_t telemetry_packets = 0;		//Counter of telemetry packets sent
+uint8_t count_packet[] = {0};		//To count how many packets have been sent (maximum WINDOW_SIZE)
+uint8_t count_window[] = {0};		//To count the window number
+uint8_t count_rtx[] = {0};			//To count the number of retransmitted packets
+uint8_t i=0;						//variable for loops
+uint8_t j=0;						//variable for loops
+uint8_t k=0;						//variable for loops
+uint64_t ack;						//Information rx in the ACK (0 => ack, 1 => nack)
+uint8_t nack_number;				//Number of the current packet to retransmit
+bool nack;							//True when retransmission necessary
+bool full_window;					//Stop & wait => to know when we reach the limit packet of the window
+bool statemach = true;				//If true, comms workflow follows the state machine. This value should be controlled by OBC
+									//Put true before activating the statemachine thread. Put false before ending comms thread
+bool send_data = false;				//If true, the state machine send packets every airtime
+bool send_telemetry = false;		//If true, we have to send telemetry packets instead of payload data
+uint8_t num_telemetry = 0;			//Total of telemetry packets that have to be sent (computed when telecomand send telemetry received)
+bool contingency = false;			//True if we are in contingency state => only receive
+
 /**
  * Main application entry point.
  */
-void prueba( void )
+void StateMachine( void )
 {
     uint16_t PacketCnt = 0, i=0;
     float Per = 0.0;
@@ -117,6 +149,7 @@ void prueba( void )
     uint16_t failCADCounter = 0;
     uint16_t test_counter = 0;
     uint16_t tx_count = 0;
+
 
     uint8_t MemoryRX[MEMORY_RX_SIZE] = {'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
     		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
@@ -249,7 +282,6 @@ void prueba( void )
             }
             case RX:
             {
-            	//HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
                 if( PacketReceived == true )
                 {
 					test_counter = test_counter + 1;
@@ -266,12 +298,19 @@ void prueba( void )
 						tx_non_stop = 1;
 						DelayMs(1000);
 					}
+					if (pin_correct(Buffer[0], Buffer[1])){
+						process_telecommand(Buffer[2], Buffer[3]);
+						State = LOWPOWER;
+					} else{
+					    State = TX;
+					    error_telecommand = true;
+					    DelayMs(10);
+					}
 
                     PacketReceived = false;     // Reset flag
                     //State = START_CAD;
                     //Radio.Rx( RX_TIMEOUT_VALUE );	//Basic RX code
 					//DelayMs(1);	//Basic RX code
-					State = LOWPOWER;
                 }
                 else
                 {
@@ -306,8 +345,6 @@ void prueba( void )
                 if (tx_count*BUFFER_SIZE>MEMORY_RX_SIZE){
                 	tx_count = 0;
                 }
-                //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-
                 State = LOWPOWER;
                 break;
             }
@@ -318,7 +355,6 @@ void prueba( void )
             }
             /*case START_CAD:
             {
-            	//HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
             	cadCounter = cadCounter + 1;
                 i++;    // Update NbTryCnt
                 TimerStop(&RxAppTimeoutTimer);  // Stop the Rx's Timer
@@ -326,15 +362,9 @@ void prueba( void )
                 if(CadRx == CAD_FAIL)
                 {
                 	failCADCounter = failCADCounter + 1;
-#if(FULL_DBG)
-                printf("No CAD detected\r\n");
-#endif
                 }
                 CadRx = CAD_FAIL;           // Reset CAD flag
                 //DelayMs(randr(10,500));     //Add a random delay for the PER test
-#if(FULL_DBG)
-                printf("CAD %d\r\n",i);
-#endif
                 Radio.StartCad( );          //StartCad Again
                 //Radio.Rx( 0 );	//Basic RX code
 				//DelayMs(1);	//Basic RX code
@@ -460,5 +490,185 @@ static void CADTimeoutTimeoutIrq( void )
 static void RxTimeoutTimerIrq( void )
 {
     RxTimeoutTimerIrqFlag = true;
+}
+
+/**************************************************************************************
+ *                                                                                    *
+ * 	Function:  pin_correct		                                                      *
+ * --------------------                                                               *
+ * 	check if the pin in the telecommand is correct								      *
+ *                                                                                    *
+ *  pin_1: first byte of the pin			                                          *
+ *  pin_2: second byte of the pin													  *
+ *                                                                                    *
+ *  returns: true if correct							                              *
+ *                                                                                    *
+ **************************************************************************************/
+bool pin_correct(uint8_t pin_1, uint8_t pin_2) {
+	if (pin_1 == PIN1 && pin_2 == PIN2){
+		return true;
+	}
+	return false;
+}
+
+
+/**************************************************************************************
+ *                                                                                    *
+ * 	Function:  process_telecommand                                                    *
+ * --------------------                                                               *
+ * 	processes the information contained in the packet depending on the telecommand    *
+ * 	received																	      *
+ *                                                                                    *
+ *  header: number of telecommand			                                          *
+ *  info: information contained in the received packet								  *
+ *                                                                                    *
+ *  returns: nothing									                              *
+ *                                                                                    *
+ **************************************************************************************/
+void process_telecommand(uint8_t header, uint8_t info) {
+	uint64_t info_write;
+	switch(header) {
+	case RESET2:
+		HAL_NVIC_SystemReset();
+		break;
+	case NOMINAL:
+		info_write = info;
+		Flash_Write_Data(TEST_ADDRESS, &info_write, 1);
+		info_write = Buffer[99];
+		Flash_Write_Data(TEST_ADDRESS+0x08, &info_write, 1);
+		break;
+	case LOW:
+		Flash_Write_Data(TEST_ADDRESS, &info, 1);
+		break;
+	case CRITICAL:
+		Flash_Write_Data(TEST_ADDRESS, &info, 1);
+		break;
+	case EXIT_LOW_POWER:{
+		Flash_Write_Data(EXIT_LOW_POWER_FLAG_ADDR, &info, 1);
+		Flash_Write_Data(EXIT_LOW_ADDR, TRUE, 1);
+		break;
+	}
+	case EXIT_SURVIVAL:{
+		Flash_Write_Data(EXIT_LOW_POWER_FLAG_ADDR, &info, 1);
+		//Flash_Write_Data(EXIT_SURVIVAL, TRUE, 1);
+		break;
+	}
+	case EXIT_SUNSAFE:{
+		Flash_Write_Data(EXIT_LOW_POWER_FLAG_ADDR, &info, 1);
+		//Flash_Write_Data(EXIT_SUNSAFE, TRUE, 1);
+		break;
+	}
+	case SET_TIME:{
+		uint8_t time[4];
+		for (k=0; k<4; k++){
+			time[k]=Buffer[k+1];
+		}
+		Flash_Write_Data(TEMP_ADDR, &time, sizeof(time));
+		break;
+	}
+	case SET_CONSTANT_KP:
+		Flash_Write_Data(KP_ADDR, &info, 1);
+		break;
+	case TLE:{
+		uint8_t tle[UPLINK_BUFFER_SIZE-1];
+		for (k=1; k<UPLINK_BUFFER_SIZE; k++){
+			tle[k-1]=Buffer[k];
+		}
+		Flash_Write_Data(TLE_ADDR + tle_packets*UPLINK_BUFFER_SIZE, &tle, sizeof(tle));
+		tle_packets++;
+		uint8_t integer_part = (uint8_t) 138/UPLINK_BUFFER_SIZE;
+		if (tle_packets == integer_part+1){
+			tle_packets = 0;
+		}
+		break;
+	}
+	case SET_GYRO_RES:
+		/*4 possibles estats, rebrem 00/01/10/11*/
+		Flash_Write_Data(GYRO_RES_ADDR, &info, 1);
+		break;
+	case SEND_DATA:{
+		if (!contingency){
+			State = TX;
+			send_data = true;
+		}
+		break;
+	}
+	case SEND_TELEMETRY:{
+		if (!contingency){
+			send_telemetry = true;
+			num_telemetry = (uint8_t) 34/BUFFER_SIZE + 1; //cast to integer to erase the decimal part
+			State = TX;
+		}
+		break;
+	}
+	case STOP_SENDING_DATA:{
+		send_data = false;
+		count_packet[0] = 0;
+		break;
+	}
+	case ACK_DATA:{
+		//check it
+	 	 ack = ack & Buffer[1];
+		 for(j=2; j<ACK_PAYLOAD_LENGTH; j++){
+			 ack = (ack << 8*j) & Buffer[j];
+		 }
+		 count_window[0] = 0;
+		 full_window = false;
+		 if (ack != 0xFFFFFFFFFFFFFFFF){
+			 nack = true;
+		 }
+		 State = TX;
+		break;
+	}
+	case SET_SF_CR: {
+		uint8_t SF;
+		if (info == 0) SF = 7;
+		else if (info == 1) SF = 8;
+		else if (info == 2) SF = 9;
+		else if (info == 3) SF = 10;
+		else if (info == 4) SF = 11;
+		else if (info == 5) SF = 12;
+		Flash_Write_Data(SF_ADDR, &SF, 1);
+		/*4 cases (4/5, 4/6, 4/7,1/2), so we will receive and store 0, 1, 2 or 3*/
+		Flash_Write_Data(CRC_ADDR, &Buffer[2], 1);
+		break;
+	}
+	case SEND_CALIBRATION:{	//Rx calibration
+		uint8_t calib[UPLINK_BUFFER_SIZE-1];
+		for (k=1; k<UPLINK_BUFFER_SIZE; k++){
+			calib[k-1]=Buffer[k];
+		}
+		Flash_Write_Data(CALIBRATION_ADDR, &calib, sizeof(calib));
+		calib_packets = calib_packets + 1;
+		uint8_t integer_part = (uint8_t) 138/UPLINK_BUFFER_SIZE;
+		if(calib_packets == integer_part+1){
+			calib_packets = 0;
+		}
+		break;
+	}
+	case TAKE_PHOTO:{
+		/*GUARDAR TEMPS FOTO?*/
+		Flash_Write_Data(PAYLOAD_STATE_ADDR, TRUE, 1);
+		Flash_Write_Data(PL_TIME_ADDR, &info, 4);
+		Flash_Write_Data(PHOTO_RESOL_ADDR, &Buffer[5], 1);
+		Flash_Write_Data(PHOTO_COMPRESSION_ADDR, &Buffer[6], 1);
+		break;
+	}
+	case TAKE_RF:{
+		Flash_Write_Data(PAYLOAD_STATE_ADDR, TRUE, 1);
+		Flash_Write_Data(PL_TIME_ADDR, &info, 8);
+		Flash_Write_Data(F_MIN_ADDR, &Buffer[9], 1);
+		Flash_Write_Data(F_MAX_ADDR, &Buffer[10], 1);
+		Flash_Write_Data(DELTA_F_ADDR, &Buffer[11], 1);
+		Flash_Write_Data(INTEGRATION_TIME_ADDR, &Buffer[12], 1);
+		break;
+	}
+	case SEND_CONFIG:{
+		uint8_t config[CONFIG_SIZE];
+		Flash_Read_Data(CONFIG_ADDR, &config, CONFIG_SIZE);
+		Radio.Send( config, CONFIG_SIZE );
+		break;
+	}
+	}
 }
 

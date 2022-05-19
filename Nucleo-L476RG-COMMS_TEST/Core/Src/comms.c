@@ -107,9 +107,14 @@ uint8_t testRX = false;
 /* FLAGS */
 uint8_t error_telecommand = false;
 uint8_t tle_telecommand = false;
-uint8_t tlecommand_rx = false;
+uint8_t telecommand_rx = false;
 uint8_t tx_flag = false;
 uint8_t contact_GS = false; //To avoid TX beacon
+uint8_t request_execution = 0;
+
+
+
+
 
 /* COUNTERS */
 uint8_t rtx_confirms = 0;	//Maximum 3 retransmissions of execution request
@@ -149,6 +154,16 @@ void StateMachine( void )
     uint16_t failCADCounter = 0;
     uint16_t test_counter = 0;
     uint16_t tx_count = 0;
+
+    States_t copy_state = State;	//ERASE AFTER FINISH TESTING
+    uint8_t reception_ack_mode = false;
+
+
+    // MOVE THIS TWO TO GLOBAL VARIABLES
+    uint8_t paquet_to_send;
+    uint8_t last_telecommand[BUFFER_SIZE];	//Last telecommand RX
+    uint8_t request_counter = 0;
+
 
 
     uint8_t MemoryRX[MEMORY_RX_SIZE] = {'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
@@ -256,7 +271,7 @@ void StateMachine( void )
     	}
     	//NO SE RX EL PRIMER PAQUETE EN EL CUBECELL. El ultimo no se recive en el stm32
         Radio.IrqProcess( );
-
+        copy_state = State;
         switch( State )
         {
             case RX_TIMEOUT:
@@ -284,33 +299,69 @@ void StateMachine( void )
             {
                 if( PacketReceived == true )
                 {
-					test_counter = test_counter + 1;
-					for (uint8_t i=0; i<BUFFER_SIZE; i++){
+					//test_counter = test_counter + 1;
+					/*for (uint8_t i=0; i<BUFFER_SIZE; i++){
 						MemoryRX[i + rxCounter*BUFFER_SIZE] = Buffer[i];
 					}
 					rxCounter = rxCounter + 1;
 					if (MEMORY_RX_SIZE < ( rxCounter*BUFFER_SIZE + BUFFER_SIZE )){
 						rxCounter = 0;
-					}
-					if (Buffer[0] == 'T' && Buffer[1] == 'X'){
+					}*/
+					/*if (Buffer[0] == 'T' && Buffer[1] == 'X'){
 						//txNonStop = true;
 						//txNonStopNum = 1;
 						tx_non_stop = 1;
 						DelayMs(1000);
-					}
+					}*/
 					if (pin_correct(Buffer[0], Buffer[1])){
-						process_telecommand(Buffer[2], Buffer[3]);
 						State = LOWPOWER;
+						if (Buffer[2] == TLE){
+							if (!tle_telecommand){	//First TLE packet
+								tle_telecommand = true;
+								State = RX;
+								telecommand_rx = true;
+							}
+							else{	//Is the last TLE packet (there are 2)
+								tle_telecommand = false;
+								State = LOWPOWER;
+								telecommand_rx = false;
+							}
+							process_telecommand(Buffer[2], Buffer[3]);	//Saves the TLE
+						}
+						else if (telecommand_rx){	//Second telecommand RX consecutively
+							if (Buffer[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND
+								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG){
+									telecommand_rx = false;
+									process_telecommand(Buffer[2], Buffer[3]);
+								}
+								else {
+									request_execution = true;
+									State = TX;
+								}
+							}
+							else if(Buffer[2] == ACK){	//Order execution ACK
+								request_execution = false;
+								reception_ack_mode = false;
+								telecommand_rx = false;
+								process_telecommand(last_telecommand[2], last_telecommand[3]);
+							}
+							else{	//Second telecommand received different from the first
+							    State = TX;
+							    error_telecommand = true;
+							    DelayMs(10);
+							}
+						}
+						else{	//First telecommand RX
+							memcpy( last_telecommand, Buffer, BufferSize );
+							telecommand_rx = true;
+							State = RX;
+						}
 					} else{
 					    State = TX;
 					    error_telecommand = true;
 					    DelayMs(10);
 					}
-
                     PacketReceived = false;     // Reset flag
-                    //State = START_CAD;
-                    //Radio.Rx( RX_TIMEOUT_VALUE );	//Basic RX code
-					//DelayMs(1);	//Basic RX code
                 }
                 else
                 {
@@ -328,11 +379,45 @@ void StateMachine( void )
                     Radio.Rx( RX_TIMEOUT_VALUE );	//Basic RX code
                     DelayMs(1);	//Basic RX code
                     State = LOWPOWER;
+
+                	if (reception_ack_mode){
+                		reception_ack_mode = false;
+                		DelayMs( 500 );
+                	}
                 }
                 break;
             }
             case TX:
             {
+            	/* TO TEST TELECOMMANDS */
+            	if (error_telecommand){	//Send error message
+            		paquet_to_send = ERROR;
+            		Radio.Send(paquet_to_send,1);
+                    State = LOWPOWER;
+                    error_telecommand = false;
+            	} else if (request_execution){	//Send request for execute telecommand order
+            		//paquet_to_send = last_telecommand[2];
+            		//Radio.Send(paquet_to_send,1);
+            		Radio.Send(last_telecommand,sizeof(last_telecommand));	//WITH ONLY ONE IT IS NOT RECEVIED => CHECK IT
+            		DelayMs(100);
+            		Radio.Send(last_telecommand,sizeof(last_telecommand));
+            		request_counter++;
+            		reception_ack_mode = true;
+            		State = RX;
+            		//TimerStart(&CADTimeoutTimer);
+            		//Radio.Rx( RX_TIMEOUT_VALUE );
+            		//PacketReceived = false;
+            	} else if (tx_flag || tx_non_stop){	//Send data
+                    txfunction();
+                    DelayMs( 1 );
+                    Radio.Send( Buffer, BUFFER_SIZE );
+                    State = LOWPOWER;
+            	} else {
+                    State = LOWPOWER;
+            	}
+
+
+            	/* TO TEST PROTOCOL AND SWITCHING BETWEEN STATES
                 // Send the next frame
                 txfunction();
                 //Send Frame
@@ -345,7 +430,8 @@ void StateMachine( void )
                 if (tx_count*BUFFER_SIZE>MEMORY_RX_SIZE){
                 	tx_count = 0;
                 }
-                State = LOWPOWER;
+                */
+            	DelayMs( 1 );
                 break;
             }
             case TX_TIMEOUT:
@@ -353,33 +439,41 @@ void StateMachine( void )
                 State = LOWPOWER;
                 break;
             }
-            /*case START_CAD:
-            {
-            	cadCounter = cadCounter + 1;
-                i++;    // Update NbTryCnt
-                TimerStop(&RxAppTimeoutTimer);  // Stop the Rx's Timer
-                // Trace for debug
-                if(CadRx == CAD_FAIL)
-                {
-                	failCADCounter = failCADCounter + 1;
-                }
-                CadRx = CAD_FAIL;           // Reset CAD flag
-                //DelayMs(randr(10,500));     //Add a random delay for the PER test
-                Radio.StartCad( );          //StartCad Again
-                //Radio.Rx( 0 );	//Basic RX code
-				//DelayMs(1);	//Basic RX code
-                State = LOWPOWER;
-            break;
-            }*/
             case LOWPOWER:
             default:
             	defaultCounter = defaultCounter + 1;
                 //State = RX;
-            	if (tx_non_stop == 1){
+            	if (reception_ack_mode){
+            		State = RX;
+            	}
+            	else if (telecommand_rx){	//We have received at least one telecommand
+            		if (request_execution ){	//In this case we have to TX request or wait for ACK
+            			if (request_counter == 3){	//If 3 request have been sent, we send an error message
+            				request_execution = false;
+            				error_telecommand = false;
+            				telecommand_rx = false;
+            			}
+            			State = TX;
+            			//TimerStart(&CADTimeoutTimer);
+            			//Radio.Rx( RX_TIMEOUT_VALUE );
+            			//DelayMs(500);
+            			//if (!PacketReceived){	//If in 500 ms the RX IRQ does not jump, we go to TX the request or the error
+            			//	State = TX;
+            			//}
+            		} else{	//We want to Rx the second telecommand
+            			//TimerStart(&CADTimeoutTimer);
+            			//Radio.Rx( RX_TIMEOUT_VALUE );
+						DelayMs(500);
+						State = RX; //If Timeout passes and the 2nd telecommand is not received, goes to RX and will process the first, as if the second has been RX
+						PacketReceived = true;
+					}
+            	}
+            	else if (tx_non_stop || error_telecommand || tx_flag){
             		State = TX;
             	}else{
             		State = RX;
             	}
+
                 // Set low power
                 break;
         }
@@ -588,16 +682,20 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		break;
 	case SEND_DATA:{
 		if (!contingency){
+
+			tx_flag = true;	//Activates TX flag
+
 			State = TX;
 			send_data = true;
 		}
 		break;
 	}
 	case SEND_TELEMETRY:{
+		/* SEND TELEMETRY DIRECTLY FROM HERE WITH RADIO.SEND */
 		if (!contingency){
 			send_telemetry = true;
 			num_telemetry = (uint8_t) 34/BUFFER_SIZE + 1; //cast to integer to erase the decimal part
-			State = TX;
+			//State = TX;
 		}
 		break;
 	}
@@ -617,7 +715,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		 if (ack != 0xFFFFFFFFFFFFFFFF){
 			 nack = true;
 		 }
-		 State = TX;
+		 //State = TX;
 		break;
 	}
 	case SET_SF_CR: {
@@ -634,6 +732,8 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		break;
 	}
 	case SEND_CALIBRATION:{	//Rx calibration
+		/* RX OR SEND???? */
+		/* IT TX, IT CAN BE DONE WITH ONE PACKET DIRECTLY FROM HERE RADIO.SEND */
 		uint8_t calib[UPLINK_BUFFER_SIZE-1];
 		for (k=1; k<UPLINK_BUFFER_SIZE; k++){
 			calib[k-1]=Buffer[k];
@@ -668,6 +768,10 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		Flash_Read_Data(CONFIG_ADDR, &config, CONFIG_SIZE);
 		Radio.Send( config, CONFIG_SIZE );
 		break;
+	}
+	default:{
+		State = TX;
+		error_telecommand = true;
 	}
 	}
 }

@@ -78,6 +78,7 @@
 //#define BUFFER_SIZE                                 64 // Define the payload size here
 
 #define BUFFER_SIZE                                 40 // Define the payload size here
+#define BUFFER_SIZE_RX								20
 
 #define MEMORY_SIZE									300
 #define MEMORY_RX_SIZE								500

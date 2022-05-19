@@ -74,6 +74,7 @@
 #define SEND_CONFIG			50	//Send all configuration
 
 #define ACK					60
+#define ERROR				65
 
 #define PIN1 				200	//Pin to avoid hacking telecommands
 #define PIN2				157	//Second byte of the PIN

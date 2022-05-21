@@ -22,21 +22,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 Maintainer: Benjamin Boulet
 */
 
-/*	THINGS TO REVISE IN THIS CODE
- * 	RF SWITCH connections are done on the opposite order
- * 	We have to program the DIO2 on the contrary
- *
- *
- *
- *
- *
- *
- */
-
-
-
 #include "comms.h"
-
 
 
 typedef enum
@@ -100,7 +86,7 @@ uint8_t Memory[MEMORY_SIZE] = {'H','O','L','A',',','S','O','C',' ','E','L',' ','
 			'E','N','D','*','*','*','*','*','*','*','*','*','*','*',
 };
 
-uint8_t tx_non_stop = 1; //1 => yes ; 0 => not
+uint8_t tx_non_stop = 0; //1 => yes ; 0 => not
 uint8_t testRX = false;
 
 
@@ -155,6 +141,8 @@ void StateMachine( void )
     uint16_t test_counter = 0;
     uint16_t tx_count = 0;
 
+    uint8_t compare_arrays = 0;
+
     States_t copy_state = State;	//ERASE AFTER FINISH TESTING
     uint8_t reception_ack_mode = false;
 
@@ -163,60 +151,6 @@ void StateMachine( void )
     uint8_t paquet_to_send;
     uint8_t last_telecommand[BUFFER_SIZE];	//Last telecommand RX
     uint8_t request_counter = 0;
-
-
-
-    uint8_t MemoryRX[MEMORY_RX_SIZE] = {'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/'
-    };
-
-    uint8_t MemoryTX[MEMORY_RX_SIZE] = {'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/',
-    		'/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/','/'
-    };
 
     // Target board initialization
     BoardInitMcu( );
@@ -257,7 +191,7 @@ void StateMachine( void )
     SX126xConfigureCad( CAD_SYMBOL_NUM,CAD_DET_PEAK,CAD_DET_MIN,CAD_TIMEOUT_MS);            // Configure the CAD
     Radio.StartCad( );          // do the config and lunch first CAD
 
-    State = TX;
+    State = RX;
 
     while(  i < NB_TRY )
     {
@@ -323,13 +257,14 @@ void StateMachine( void )
 							}
 							else{	//Is the last TLE packet (there are 2)
 								tle_telecommand = false;
-								State = LOWPOWER;
+								State = LOWPOWER;	//Line unnecessary
 								telecommand_rx = false;
 							}
 							process_telecommand(Buffer[2], Buffer[3]);	//Saves the TLE
 						}
 						else if (telecommand_rx){	//Second telecommand RX consecutively
-							if (Buffer[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND
+							if (Buffer[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND. USE VARIABLE compare_arrays
+								//Buffer[2] == (SEND_DATA || SEND_TELEMETRY || ACK_DATA || SEND_CALIBRATION || SEND_CONFIG)
 								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG){
 									telecommand_rx = false;
 									process_telecommand(Buffer[2], Buffer[3]);
@@ -344,9 +279,11 @@ void StateMachine( void )
 								reception_ack_mode = false;
 								telecommand_rx = false;
 								process_telecommand(last_telecommand[2], last_telecommand[3]);
+								State = RX;
 							}
 							else{	//Second telecommand received different from the first
 							    State = TX;
+							    telecommand_rx = false;
 							    error_telecommand = true;
 							    DelayMs(10);
 							}
@@ -356,14 +293,14 @@ void StateMachine( void )
 							telecommand_rx = true;
 							State = RX;
 						}
-					} else{
+					} else{	//Pin not correct. If pin not correct it is assumed that the packet comes from another source. The protocol continues ignoring it
 					    State = TX;
 					    error_telecommand = true;
 					    DelayMs(10);
 					}
                     PacketReceived = false;     // Reset flag
                 }
-                else
+                else	//If packet not received, restart reception process
                 {
                     if (CadRx == CAD_SUCCESS)
                     {
@@ -390,17 +327,18 @@ void StateMachine( void )
             case TX:
             {
             	/* TO TEST TELECOMMANDS */
+                State = LOWPOWER;
             	if (error_telecommand){	//Send error message
             		paquet_to_send = ERROR;
             		Radio.Send(paquet_to_send,1);
-                    State = LOWPOWER;
                     error_telecommand = false;
             	} else if (request_execution){	//Send request for execute telecommand order
             		//paquet_to_send = last_telecommand[2];
             		//Radio.Send(paquet_to_send,1);
-            		Radio.Send(last_telecommand,sizeof(last_telecommand));	//WITH ONLY ONE IT IS NOT RECEVIED => CHECK IT
+            		DelayMs( 300 );
+            		Radio.Send(last_telecommand,sizeof(last_telecommand));	//TEST ONLY SENDING ONE REQUEST (NORMALLY PACKETS ARE TX IN PAIRS
             		DelayMs(100);
-            		Radio.Send(last_telecommand,sizeof(last_telecommand));
+            		//Radio.Send(last_telecommand,sizeof(last_telecommand));	//Better here or iterate another time and return to TX?
             		request_counter++;
             		reception_ack_mode = true;
             		State = RX;
@@ -411,11 +349,7 @@ void StateMachine( void )
                     txfunction();
                     DelayMs( 1 );
                     Radio.Send( Buffer, BUFFER_SIZE );
-                    State = LOWPOWER;
-            	} else {
-                    State = LOWPOWER;
             	}
-
 
             	/* TO TEST PROTOCOL AND SWITCHING BETWEEN STATES
                 // Send the next frame
@@ -450,10 +384,11 @@ void StateMachine( void )
             		if (request_execution ){	//In this case we have to TX request or wait for ACK
             			if (request_counter == 3){	//If 3 request have been sent, we send an error message
             				request_execution = false;
-            				error_telecommand = false;
+            				error_telecommand = true;
             				telecommand_rx = false;
             			}
-            			State = TX;
+            			State = RX;
+            			/*State = TX;*/// IN THE CASE OF RETRANSMISSIONS OF REQUEST
             			//TimerStart(&CADTimeoutTimer);
             			//Radio.Rx( RX_TIMEOUT_VALUE );
             			//DelayMs(500);
@@ -463,9 +398,9 @@ void StateMachine( void )
             		} else{	//We want to Rx the second telecommand
             			//TimerStart(&CADTimeoutTimer);
             			//Radio.Rx( RX_TIMEOUT_VALUE );
-						DelayMs(500);
+						//DelayMs(500);
 						State = RX; //If Timeout passes and the 2nd telecommand is not received, goes to RX and will process the first, as if the second has been RX
-						PacketReceived = true;
+						//PacketReceived = true;
 					}
             	}
             	else if (tx_non_stop || error_telecommand || tx_flag){

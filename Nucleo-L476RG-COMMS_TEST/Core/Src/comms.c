@@ -620,14 +620,21 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		Flash_Write_Data(KP_ADDR, &info, 1);
 		break;
 	case TLE:{
-		uint8_t tle[TLE_PACKET_SIZE];
-		for (k=0; k<TLE_PACKET_SIZE; k++){
-			tle[k]=Buffer[k+3];
-		}
-		Flash_Write_Data(TEST_ADDRESS + tle_packets*(TLE_PACKET_SIZE), &tle, sizeof(tle));
-		tle_packets++;
-		uint8_t integer_part = (uint8_t) 138/UPLINK_BUFFER_SIZE;
-		if (tle_packets == integer_part+1){
+		//  THIS CODE IS NOT OPTIMIZED AND NOT FULLY TESTED
+		if (tle_packets == 0){
+			uint8_t tle[TLE_PACKET_SIZE];
+			for (k=0; k<TLE_PACKET_SIZE; k++){
+				tle[k]=Buffer[k+3];
+			}
+			Flash_Write_Data(TEST_ADDRESS2 + tle_packets*(TLE_PACKET_SIZE), &tle, sizeof(tle));
+			tle_packets++;
+		} else{
+			uint8_t tle2[TLE_PACKET_SIZE];
+			for (k=0; k<TLE_PACKET_SIZE; k++){
+				tle2[k]=Buffer[k+3];
+			}
+			Flash_Write_Data(TEST_ADDRESS2 + tle_packets*(TLE_PACKET_SIZE), &tle2, sizeof(tle2));
+			tle_packets++;
 			tle_packets = 0;
 		}
 		break;

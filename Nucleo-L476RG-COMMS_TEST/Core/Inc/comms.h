@@ -84,7 +84,7 @@
 #define MEMORY_SIZE									300
 #define MEMORY_RX_SIZE								500
 
-#define TLE_PACKET_SIZE								69
+#define TLE_PACKET_SIZE								66
 
 
 /*!

@@ -75,6 +75,7 @@
 #define COUNT_RTX_ADDR 				0x08008202
 
 #define TEST_ADDRESS 				0x0800E860
+#define TEST_ADDRESS2 				0x0800EB80
 
 
 

@@ -77,11 +77,14 @@
 #define RX_TIMEOUT_VALUE                            4000
 //#define BUFFER_SIZE                                 64 // Define the payload size here
 
-#define BUFFER_SIZE                                 40 // Define the payload size here
+//#define BUFFER_SIZE                                 40 // Define the payload size here
+#define BUFFER_SIZE									100
 #define BUFFER_SIZE_RX								20
 
 #define MEMORY_SIZE									300
 #define MEMORY_RX_SIZE								500
+
+#define TLE_PACKET_SIZE								69
 
 
 /*!
@@ -110,7 +113,7 @@ TimerEvent_t RxAppTimeoutTimer;
 
 
 
-#define UPLINK_BUFFER_SIZE					15
+#define UPLINK_BUFFER_SIZE					100
 #define ACK_PAYLOAD_LENGTH					5			//ACK payload data length
 #define CONFIG_SIZE		13
 

@@ -76,6 +76,7 @@
 
 #define TEST_ADDRESS 				0x0800E860
 #define TEST_ADDRESS2 				0x0800EB80
+#define TEST_ADDRESS3 				0x0800F000
 
 
 

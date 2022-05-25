@@ -61,14 +61,12 @@
 
 /*
 #elif defined( USE_MODEM_FSK )
-
 #define FSK_FDEV                                    25e3      // Hz
 #define FSK_DATARATE                                50e3      // bps
 #define FSK_BANDWIDTH                               100e3     // Hz >> DSB in sx126x
 #define FSK_AFC_BANDWIDTH                           100e3     // Hz
 #define FSK_PREAMBLE_LENGTH                         5         // Same for Tx and Rx
 #define FSK_FIX_LENGTH_PAYLOAD_ON                   false
-
 #else
 //    #error "Please define a modem in the compiler options."
 #endif
@@ -78,7 +76,7 @@
 //#define BUFFER_SIZE                                 64 // Define the payload size here
 
 //#define BUFFER_SIZE                                 40 // Define the payload size here
-#define BUFFER_SIZE									100
+#define BUFFER_SIZE									100//40
 #define BUFFER_SIZE_RX								20
 
 #define MEMORY_SIZE									300

@@ -14,11 +14,8 @@
  _____) ) ____| | | || |_| ____( (___| | | |
 (______/|_____)_|_|_| \__)_____)\____)_| |_|
     (C)2013 Semtech
-
 Description: CAD performance evaluation test
-
 License: Revised BSD License, see LICENSE.TXT file include in the project
-
 Maintainer: Benjamin Boulet
 */
 
@@ -331,9 +328,11 @@ void StateMachine( void )
             		//paquet_to_send = last_telecommand[2];
             		//Radio.Send(paquet_to_send,1);
             		DelayMs(100);
-            		Radio.Send(last_telecommand,sizeof(last_telecommand));	//TEST ONLY SENDING ONE REQUEST (NORMALLY PACKETS ARE TX IN PAIRS
+            		Radio.Send(last_telecommand,3);	//TEST ONLY SENDING ONE REQUEST (NORMALLY PACKETS ARE TX IN PAIRS
+            		//Radio.Send(last_telecommand,sizeof(last_telecommand));	//TEST ONLY SENDING ONE REQUEST (NORMALLY PACKETS ARE TX IN PAIRS
             		DelayMs(100);
-            		Radio.Send(last_telecommand,sizeof(last_telecommand));	//Better here or iterate another time and return to TX?
+            		Radio.Send(last_telecommand,3);	//TEST ONLY SENDING ONE REQUEST (NORMALLY PACKETS ARE TX IN PAIRS
+            		//Radio.Send(last_telecommand,sizeof(last_telecommand));	//Better here or iterate another time and return to TX?
             		request_counter++;
             		reception_ack_mode = true;
             		State = RX;
@@ -620,7 +619,18 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		Flash_Write_Data(KP_ADDR, &info, 1);
 		break;
 	case TLE:{
-		//  THIS CODE IS NOT OPTIMIZED AND NOT FULLY TESTED
+		/*
+		uint8_t tle[TLE_PACKET_SIZE];
+		for (k=0; k<TLE_PACKET_SIZE; k++){
+			tle[k]=Buffer[k+3];
+		}
+		Flash_Write_Data(TEST_ADDRESS2 + tle_packets*(TLE_PACKET_SIZE), &tle, sizeof(tle));
+		if (tle_packets > 0){
+			tle_packets = 0;
+		}else{
+			tle_packets++;
+		}*/
+		//SEE WHY THE PREVIOUS CODE DOES NOT WORKS
 		if (tle_packets == 0){
 			uint8_t tle[TLE_PACKET_SIZE];
 			for (k=0; k<TLE_PACKET_SIZE; k++){
@@ -738,4 +748,3 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	}
 	}
 }
-

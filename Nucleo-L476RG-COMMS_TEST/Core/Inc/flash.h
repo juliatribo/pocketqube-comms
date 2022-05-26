@@ -78,7 +78,7 @@
 #define TEST_ADDRESS2 				0x0800EB80
 #define TEST_ADDRESS3 				0x0800F000
 
-
+#define SAVE_PHOTO					0x08010000
 
 uint32_t Flash_Write_Data(uint32_t Address, uint64_t *Data_write, uint16_t numberofbytes);
 

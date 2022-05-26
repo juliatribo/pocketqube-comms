@@ -57,7 +57,7 @@
 #define LORA_FIX_LENGTH_PAYLOAD_ON                  false
 #define LORA_IQ_INVERSION_ON                        false
 #define LORA_FIX_LENGTH_PAYLOAD_LEN                 19
-#define WINDOW_SIZE									20
+#define WINDOW_SIZE									10//20
 
 /*
 #elif defined( USE_MODEM_FSK )

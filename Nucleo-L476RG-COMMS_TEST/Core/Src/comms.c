@@ -76,7 +76,19 @@ uint8_t testRX = false;
 uint8_t error_telecommand = false;
 uint8_t tx_flag = false;
 
+/* FLAGS */
+uint8_t tle_telecommand = false;
+uint8_t telecommand_rx = false;
+uint8_t contact_GS = false; //To avoid TX beacon
+uint8_t request_execution = 0;
 
+uint8_t paquet_to_send;
+uint8_t last_telecommand[BUFFER_SIZE];	//Last telecommand RX
+uint8_t request_counter = 0;
+uint8_t paquet_number = 0;
+uint8_t window_paquet = 0;
+
+uint16_t rx_attemps_counter = 0;	//Instead of timeout with timers, counting iterations
 
 
 /* COUNTERS */
@@ -123,20 +135,6 @@ void StateMachine( void )
     States_t copy_state = State;	//ERASE AFTER FINISH TESTING
     uint8_t reception_ack_mode = false;
 
-
-    // MOVE THIS TWO TO GLOBAL VARIABLES
-    /* FLAGS */
-    uint8_t tle_telecommand = false;
-    uint8_t telecommand_rx = false;
-    uint8_t contact_GS = false; //To avoid TX beacon
-    uint8_t request_execution = 0;
-
-    uint8_t paquet_to_send;
-    uint8_t last_telecommand[BUFFER_SIZE];	//Last telecommand RX
-    uint8_t request_counter = 0;
-
-    uint16_t rx_attemps_counter = 0;	//Instead of timeout with timers, counting iterations
-
     // Target board initialization
     BoardInitMcu( );
     BoardInitPeriph( );
@@ -178,16 +176,18 @@ void StateMachine( void )
 
     State = RX;
 
-    while(  i < NB_TRY )
+    //while(  i < NB_TRY )
+    while( 1 )
     {
 		//DelayMs( 300 );
     	bucleCounter = bucleCounter + 1;
 
-    	if (tx_non_stop == 1){
+    	/*if (tx_non_stop == 1){
     		DelayMs( 300 );
     	}else{
     		DelayMs( 1 );
-    	}
+    	}*/
+    	DelayMs( 1 );
         Radio.IrqProcess( );
         copy_state = State;
         switch( State )
@@ -341,9 +341,32 @@ void StateMachine( void )
             		//Radio.Rx( RX_TIMEOUT_VALUE );
             		//PacketReceived = false;
             	} else if (tx_flag || tx_non_stop){	//Send data
-                    txfunction();
-                    DelayMs( 1 );
-                    Radio.Send( Buffer, BUFFER_SIZE );
+                    //txfunction( );
+            		uint64_t read_photo[12];
+            		uint8_t transformed[96];
+            		if (window_paquet < WINDOW_SIZE){
+            			Flash_Read_Data(SAVE_PHOTO+paquet_number*96, &read_photo, sizeof(read_photo));
+            			Buffer[0] = 0x86;	//Satellite ID
+            			Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
+            			Buffer[2] = paquet_number;	//Number of the paquet
+            			memcpy(&transformed, read_photo, sizeof(transformed));
+            			for (uint8_t i=3; i<BUFFER_SIZE-1; i++){
+            				Buffer[i] = transformed[i-3];
+            			}
+            			Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the paquet indicator
+            			paquet_number++;
+            			window_paquet++;
+            			State = TX;
+                        DelayMs( 300 );
+                        Radio.Send( Buffer, BUFFER_SIZE );
+            		} else{
+            			tx_non_stop = false;
+            			tx_flag = false;
+            			send_data = false;
+            			window_paquet = 0;
+            			State = RX;
+            		}
+                    DelayMs( 200 );
             	}
 
             	/* TO TEST PROTOCOL AND SWITCHING BETWEEN STATES
@@ -431,14 +454,36 @@ void StateMachine( void )
 }
 
 void txfunction( void ){
-	for (uint8_t i = 0; i<BUFFER_SIZE; i=i+1){
+	uint64_t read_photo[12];
+	uint8_t transformed[96];
+	if (window_paquet < WINDOW_SIZE){
+		Flash_Read_Data(SAVE_PHOTO+paquet_number*96, &read_photo, sizeof(read_photo));
+		Buffer[0] = 0x86;	//Satellite ID
+		Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
+		Buffer[2] = paquet_number;	//Number of the paquet
+		memcpy(&transformed, read_photo, sizeof(transformed));
+		for (uint8_t i=3; i<BUFFER_SIZE-1; i++){
+			Buffer[i] = transformed[i-3];
+		}
+		Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the paquet indicator
+		paquet_number++;
+		window_paquet++;
+		State = TX;
+	} else{
+		tx_non_stop = false;
+		tx_flag = false;
+		send_data = false;
+		window_paquet = 0;
+		State = RX;
+	}
+	/*for (uint8_t i = 0; i<BUFFER_SIZE; i=i+1){
 		Buffer[i] = Memory[i+txCounter*BUFFER_SIZE];
 	}
 	txCounter = txCounter + 1;
 	if (MEMORY_SIZE < ( txCounter*BUFFER_SIZE + BUFFER_SIZE )){
 		txCounter = 0;
 		tx_non_stop = 0;
-	}
+	}*/
 }
 
 void OnTxDone( void )
@@ -655,9 +700,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		break;
 	case SEND_DATA:{
 		if (!contingency){
-
 			tx_flag = true;	//Activates TX flag
-
 			State = TX;
 			send_data = true;
 		}

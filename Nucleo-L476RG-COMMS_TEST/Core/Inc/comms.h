@@ -8,7 +8,6 @@
 #ifndef INC_COMMS_H_
 #define INC_COMMS_H_
 
-
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -25,68 +24,33 @@
 #include "flash.h"
 #include "definitions.h"
 
+#define RF_FREQUENCY                       	868000000 // Hz
 
-//#if defined( USE_BAND_868 )
+#define TX_OUTPUT_POWER                     22        // dBm
 
-#define RF_FREQUENCY                                868000000 // Hz
+#define LORA_BANDWIDTH                      0         // [0: 125 kHz,
+													  //  1: 250 kHz,
+													  //  2: 500 kHz,
+													  //  3: Reserved]
+#define LORA_SPREADING_FACTOR               7         // [SF7..SF12]
+#define LORA_CODINGRATE                     1         // [1: 4/5,
+													  //  2: 4/6,
+													  //  3: 4/7,
+													  //  4: 4/8]
+#define LORA_PREAMBLE_LENGTH                8//108    // Same for Tx and Rx
+#define LORA_SYMBOL_TIMEOUT                 100       // Symbols
+#define LORA_FIX_LENGTH_PAYLOAD_ON          false
+#define LORA_IQ_INVERSION_ON                false
+#define LORA_FIX_LENGTH_PAYLOAD_LEN         19
+#define WINDOW_SIZE							20
 
-//#elif defined( USE_BAND_915 )
+#define RX_TIMEOUT_VALUE                    4000
+#define BUFFER_SIZE							100
 
-//#define RF_FREQUENCY                                915000000 // Hz
-
-//#else
-//    #error "Please define a frequency band in the compiler options."
-//#endif
-
-#define TX_OUTPUT_POWER                             22        // dBm
-
-//#if defined( USE_MODEM_LORA )
-
-#define LORA_BANDWIDTH                              0         // [0: 125 kHz,
-                                                              //  1: 250 kHz,
-                                                              //  2: 500 kHz,
-                                                              //  3: Reserved]
-#define LORA_SPREADING_FACTOR                       7         // [SF7..SF12]
-#define LORA_CODINGRATE                             1         // [1: 4/5,
-                                                              //  2: 4/6,
-                                                              //  3: 4/7,
-                                                              //  4: 4/8]
-#define LORA_PREAMBLE_LENGTH                        8//108       // Same for Tx and Rx
-#define LORA_SYMBOL_TIMEOUT                         100       // Symbols
-#define LORA_FIX_LENGTH_PAYLOAD_ON                  false
-#define LORA_IQ_INVERSION_ON                        false
-#define LORA_FIX_LENGTH_PAYLOAD_LEN                 19
-#define WINDOW_SIZE									10//20
-
-/*
-#elif defined( USE_MODEM_FSK )
-#define FSK_FDEV                                    25e3      // Hz
-#define FSK_DATARATE                                50e3      // bps
-#define FSK_BANDWIDTH                               100e3     // Hz >> DSB in sx126x
-#define FSK_AFC_BANDWIDTH                           100e3     // Hz
-#define FSK_PREAMBLE_LENGTH                         5         // Same for Tx and Rx
-#define FSK_FIX_LENGTH_PAYLOAD_ON                   false
-#else
-//    #error "Please define a modem in the compiler options."
-#endif
-*/
-
-#define RX_TIMEOUT_VALUE                            4000
-//#define BUFFER_SIZE                                 64 // Define the payload size here
-
-//#define BUFFER_SIZE                                 40 // Define the payload size here
-#define BUFFER_SIZE									100//40
-#define BUFFER_SIZE_RX								20
-
-#define MEMORY_SIZE									300
-#define MEMORY_RX_SIZE								500
-
-#define TLE_PACKET_SIZE								66
-#define TELEMETRY_PACKET_SIZE						34
-#define CALIBRATION_PACKET_SIZE						96
-#define CONFIG_PACKET_SIZE							30
-
-
+#define TLE_PACKET_SIZE						66
+#define TELEMETRY_PACKET_SIZE				34
+#define CALIBRATION_PACKET_SIZE				96
+#define CONFIG_PACKET_SIZE					30
 
 /*!
  *	CAD performance evaluation's parameters
@@ -94,9 +58,6 @@
 #define RX_FW       1
 #define TX_FW       0   //TX_FW is only for test
 #define FULL_DBG    1   //Active all traces
-
-
-
 
 // Apps CAD timer
 TimerEvent_t CADTimeoutTimer;
@@ -114,8 +75,8 @@ TimerEvent_t RxAppTimeoutTimer;
 
 
 
-#define UPLINK_BUFFER_SIZE					100
-#define ACK_PAYLOAD_LENGTH					5			//ACK payload data length
+#define UPLINK_BUFFER_SIZE		100
+#define ACK_PAYLOAD_LENGTH		5			//ACK payload data length
 #define CONFIG_SIZE		13
 
 
@@ -206,9 +167,6 @@ bool pin_correct(uint8_t pin_1, uint8_t pin_2);
 void tx_beacon(void);
 
 void comms_timmer(void);
-
-
-
 
 #endif /* INC_COMMS_H_ */
 

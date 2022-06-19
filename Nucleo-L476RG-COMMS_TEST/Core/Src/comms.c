@@ -553,9 +553,9 @@ void StateMachine( void )
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  tx_beacon                                                 *
+ *  Function:  tx_beacon                                                 *
  *  --------------------                                                 *
- * 	Activates the flags to TX the beacon                                 *
+ *  Activates the flags to TX the beacon                                 *
  *                                                                       *
  *  returns: nothing                                                     *
  *                                                                       *
@@ -571,9 +571,9 @@ void tx_beacon(void){
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  OnTxDone                                                  *
+ *  Function:  OnTxDone                                                  *
  *  --------------------                                                 *
- * 	Activate the flag to indicate that the RX timeout has finished       *
+ *  Activate the flag to indicate that the RX timeout has finished       *
  *                                                                       *
  *  returns: nothing                                                     *
  *                                                                       *
@@ -623,9 +623,9 @@ void txfunction( void ){
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  OnTxDone                                                  *
+ *  Function:  OnTxDone                                                  *
  *  --------------------                                                 *
- * 	when the transmission finish correctly                               *
+ *  when the transmission finish correctly                               *
  *                                                                       *
  *  returns: nothing                                                     *
  *                                                                       *
@@ -642,10 +642,10 @@ void OnTxDone( void )
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  OnRxDone                                                  *
+ *  Function:  OnRxDone                                                  *
  *  --------------------                                                 *
- * 	processes the information when the reception has been done correctly *
- * 	calculates the rssi and snr                                          *
+ *  processes the information when the reception has been done correctly *
+ *  calculates the rssi and snr                                          *
  *                                                                       *
  *  payload: information received                                        *
  *  size: size of the payload                                            *
@@ -673,9 +673,9 @@ void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  OnTxTimeout                                               *
+ *  Function:  OnTxTimeout                                               *
  *  --------------------                                                 *
- * 	to process transmission timeout                                      *
+ *  to process transmission timeout                                      *
  *                                                                       *
  *  returns: nothing                                                     *
  *                                                                       *
@@ -688,9 +688,9 @@ void OnTxTimeout( void )
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  OnRxTimeout                                               *
+ *  Function:  OnRxTimeout                                               *
  *  --------------------                                                 *
- * 	to process reception timeout                                         *
+ *  to process reception timeout                                         *
  *                                                                       *
  *  returns: nothing                                                     *
  *                                                                       *
@@ -718,9 +718,9 @@ void OnRxTimeout( void )
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  OnRxErro                                                  *
+ *  Function:  OnRxErro                                                  *
  *  --------------------                                                 *
- * 	function called when a reception error occurs                        *
+ *  function called when a reception error occurs                        *
  *                                                                       *
  *  returns: nothing                                                     *
  *                                                                       *
@@ -733,9 +733,9 @@ void OnRxError( void )
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  OnCadDone                                                 *
+ *  Function:  OnCadDone                                                 *
  *  --------------------                                                 *
- * 	Function to check if the CAD has been done correctly or not          *
+ *  Function to check if the CAD has been done correctly or not          *
  *                                                                       *
  *  channelActivityDetected: boolean that contains the CAD flat          *
  *                                                                       *
@@ -759,9 +759,9 @@ void OnCadDone( bool channelActivityDetected)
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  SX126xConfigureCad                                        *
+ *  Function:  SX126xConfigureCad                                        *
  *  --------------------                                                 *
- * 	Function Configure the Channel Activity Detection parameters and IRQ *
+ *  Function Configure the Channel Activity Detection parameters and IRQ *
  *                                                                       *
  *  returns: nothing                                                     *
  *                                                                       *
@@ -777,9 +777,9 @@ void SX126xConfigureCad( RadioLoRaCadSymbols_t cadSymbolNum, uint8_t cadDetPeak,
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  CADTimeoutTimeoutIrq                                      *
+ *  Function:  CADTimeoutTimeoutIrq                                      *
  *  --------------------                                                 *
- * 	Function called automatically when a CAD IRQ occurs                  *
+ *  Function called automatically when a CAD IRQ occurs                  *
  *                                                                       *
  *  returns: nothing                                                     *
  *                                                                       *
@@ -798,9 +798,9 @@ static void CADTimeoutTimeoutIrq( void )
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  RxTimeoutTimerIrq                                         *
+ *  Function:  RxTimeoutTimerIrq                                         *
  *  --------------------                                                 *
- * 	Function called automatically when a Timeout interruption occurs     *
+ *  Function called automatically when a Timeout interruption occurs     *
  *                                                                       *
  *  returns: nothing                                                     *
  *                                                                       *
@@ -812,9 +812,9 @@ static void RxTimeoutTimerIrq( void )
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  pin_correct                                               *
+ *  Function:  pin_correct                                               *
  *  --------------------                                                 *
- * 	check if the pin in the telecommand is correct                       *
+ *  check if the pin in the telecommand is correct                       *
  *                                                                       *
  *  pin_1: first byte of the pin                                         *
  *  pin_2: second byte of the pin                                        *
@@ -832,10 +832,10 @@ bool pin_correct(uint8_t pin_1, uint8_t pin_2) {
 
 /*************************************************************************
  *                                                                       *
- * 	Function:  process_telecommand                                       *
+ *  Function:  process_telecommand                                       *
  *  --------------------                                                 *
- * 	processes the information contained in the packet depending on       *
- * 	the telecommand received                                             *
+ *  processes the information contained in the packet depending on       *
+ *  the telecommand received                                             *
  *                                                                       *
  *  header: number of telecomman                                         *
  *  info: information contained in the received packet                   *

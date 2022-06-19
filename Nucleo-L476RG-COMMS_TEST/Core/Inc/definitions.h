@@ -81,6 +81,9 @@
 #define PIN1 				200	//Pin to avoid hacking telecommands
 #define PIN2				157	//Second byte of the PIN
 
+#define MISSION_ID			0x74
+#define POCKETQUBE_ID		0x72
+
 
 
 //#define

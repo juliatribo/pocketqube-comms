@@ -3,6 +3,17 @@
  *
  *  Created on: 23 feb. 2022
  *      Author: Daniel Herencia Ruiz
+ * \code
+ *
+ * 				 _______    ______    ____    ____    ____    ____     ______
+ * 				/ ______)  /  __  \  |    \  /    |  |    \  /    |   / _____)
+ * 			   / /         | |  | |  |  \  \/  /  |  |  \  \/  /  |  ( (____
+ *            ( (          | |  | |  |  |\    /|  |  |  |\    /|  |   \____ \
+ *             \ \______   | |__| |  |  | \__/ |  |  |  | \__/ |  |   _____) )
+ *              \_______)  \______/  |__|      |__|  |__|      |__|  (______/
+ *
+ *
+ * \endcode
  */
 
 #include "comms.h"
@@ -117,6 +128,53 @@ bool send_telemetry = false;		//If true, we have to send telemetry packets inste
 uint8_t num_telemetry = 0;			//Total of telemetry packets that have to be sent (computed when telecomand send telemetry received)
 bool contingency = false;			//True if we are in contingency state => only receive
 
+
+/**************************************************************************************
+ *                                                                                    *
+ * 	Function:  configuration		                                                  *
+ * 	--------------------                                                              *
+ * 	function to configure the transceiver and the transmission protocol parameters    *
+ *                                                                                    *
+ *  returns: nothing									                              *
+ *                                                                                    *
+ **************************************************************************************/
+void configuration(void){
+
+	uint64_t read_variable;
+	Read_Flash(SF_ADDR, &read_variable, 1);
+	memcpy(&SF, read_variable, sizeof(SF));
+	Read_Flash(CRC_ADDR, &read_variable, 1);
+	memcpy(&CR, read_variable, sizeof(CR));
+	Read_Flash(COMMS_TIME_ADDR, &read_variable, 1);
+	memcpy(&time_packets, read_variable, sizeof(time_packets));
+
+    Radio.SetChannel( RF_FREQUENCY );
+
+    Radio.SetTxConfig( MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH, SF, CR,
+                                   LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
+                                   true, 0, 0, LORA_IQ_INVERSION_ON, 3000 );
+
+    Radio.SetRxConfig( MODEM_LORA, LORA_BANDWIDTH, SF, CR, 0, LORA_PREAMBLE_LENGTH,
+                                   LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
+                                   0, true, 0, 0, LORA_IQ_INVERSION_ON, true );
+    /*
+    Radio.SetTxConfig( MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
+                                   LORA_SPREADING_FACTOR, LORA_CODINGRATE,
+                                   LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
+                                   true, 0, 0, LORA_IQ_INVERSION_ON, 3000 );
+
+    Radio.SetRxConfig( MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
+                                   LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
+                                   LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
+                                   0, true, 0, 0, LORA_IQ_INVERSION_ON, true );*/
+
+    SX126xConfigureCad( CAD_SYMBOL_NUM,CAD_DET_PEAK,CAD_DET_MIN,CAD_TIMEOUT_MS);            // Configure the CAD
+    Radio.StartCad( );          // do the config and lunch first CAD
+
+    State = RX;
+};
+
+
 /**
  * Main application entry point.
  */
@@ -158,25 +216,8 @@ void StateMachine( void )
     TimerSetValue( &RxAppTimeoutTimer, RX_TIMER_TIMEOUT );
 
     Radio.Init( &RadioEvents );
-    Radio.SetChannel( RF_FREQUENCY );
 
-//#if defined( USE_MODEM_LORA )
-
-    Radio.SetTxConfig( MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
-                                   LORA_SPREADING_FACTOR, LORA_CODINGRATE,
-                                   LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
-                                   true, 0, 0, LORA_IQ_INVERSION_ON, 3000 );
-
-    Radio.SetRxConfig( MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
-                                   LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
-                                   LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
-                                   0, true, 0, 0, LORA_IQ_INVERSION_ON, true );
-
-
-    SX126xConfigureCad( CAD_SYMBOL_NUM,CAD_DET_PEAK,CAD_DET_MIN,CAD_TIMEOUT_MS);            // Configure the CAD
-    Radio.StartCad( );          // do the config and lunch first CAD
-
-    State = RX;
+    configuration();
 
     //while(  i < NB_TRY )
     while( 1 )
@@ -284,6 +325,8 @@ void StateMachine( void )
 						}
 						else{	//First telecommand RX
 							memcpy( last_telecommand, Buffer, BufferSize );
+							last_telecommand[0] = MISSION_ID;	//To avoid retransmitting the PIN
+							last_telecommand[1] = POCKETQUBE_ID;
 							tle_telecommand = false;
 							telecommand_rx = true;
 							State = RX;
@@ -328,7 +371,7 @@ void StateMachine( void )
             	/* TO TEST TELECOMMANDS */
                 State = LOWPOWER;
             	if (error_telecommand){	//Send error message
-            		uint8_t packet_to_send[] = {ERROR,ERROR,ERROR};
+            		uint8_t packet_to_send[] = {MISSION_ID,POCKETQUBE_ID,ERROR};
             		Radio.Send(packet_to_send,sizeof(packet_to_send));
             		DelayMs(100);
             		Radio.Send(packet_to_send,sizeof(packet_to_send));
@@ -373,8 +416,8 @@ void StateMachine( void )
                 			Buffer[2] = packet_number;	//Number of the packet
                 			packet_number++;
             			}
-            			Buffer[0] = 0x86;	//Satellite ID
-            			Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
+            			Buffer[0] = MISSION_ID;	//Satellite ID
+            			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
             			memcpy(&transformed, read_photo, sizeof(transformed));
             			for (uint8_t i=3; i<BUFFER_SIZE-1; i++){
             				Buffer[i] = transformed[i-3];
@@ -382,7 +425,8 @@ void StateMachine( void )
             			Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the packet indicator
             			window_packet++;
             			State = TX;
-                        DelayMs( 300 );
+                        //DelayMs( 300 );
+            			DelayMs( (uint16_t) time_packets*3/5 );
                         Radio.Send( Buffer, BUFFER_SIZE );
             		} else{
             			tx_non_stop = false;
@@ -391,9 +435,10 @@ void StateMachine( void )
             			window_packet = 0;
             			State = RX;
             		}
-                    DelayMs( 200 );
+                    //DelayMs( 200 );
+            		DelayMs( (uint16_t) time_packets*2/5 );
             	} else if (beacon_flag){
-					uint8_t packet_to_send[] = {BEACON,BEACON,BEACON};
+					uint8_t packet_to_send[] = {MISSION_ID,POCKETQUBE_ID,BEACON};
 					Radio.Send(packet_to_send,sizeof(packet_to_send));
 					DelayMs(100);
 					Radio.Send(packet_to_send,sizeof(packet_to_send));
@@ -516,8 +561,8 @@ void txfunction( void ){
 	uint8_t transformed[96];
 	if (window_packet < WINDOW_SIZE){
 		Flash_Read_Data(SAVE_PHOTO+packet_number*96, &read_photo, sizeof(read_photo));
-		Buffer[0] = 0x86;	//Satellite ID
-		Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
+		Buffer[0] = MISSION_ID;	//Satellite ID
+		Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
 		Buffer[2] = packet_number;	//Number of the packet
 		memcpy(&transformed, read_photo, sizeof(transformed));
 		for (uint8_t i=3; i<BUFFER_SIZE-1; i++){
@@ -764,8 +809,8 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		uint8_t transformed[TELEMETRY_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
 		if (!contingency){
 			Flash_Read_Data(TELEMETRY_ADDR, &read_telemetry, sizeof(read_telemetry));
-			Buffer[0] = 0x86;	//Satellite ID
-			Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
+			Buffer[0] = MISSION_ID;	//Satellite ID
+			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
 			Buffer[2] = num_telemetry;	//Number of the packet
 			memcpy(&transformed, read_telemetry, sizeof(transformed));
 			for (uint8_t i=3; i<TELEMETRY_PACKET_SIZE; i++){
@@ -808,6 +853,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		info_write = Buffer[4];
 		Flash_Write_Data(CRC_ADDR, &info_write, 1);
 		DelayMs(10);
+		configuration();
 		break;
 	}
 	case SEND_CALIBRATION:{
@@ -853,8 +899,8 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		uint8_t transformed[CONFIG_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
 		if (!contingency){
 			Flash_Read_Data(CONFIG_PACKET_SIZE, &read_config, sizeof(read_config));
-			Buffer[0] = 0x86;	//Satellite ID
-			Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
+			Buffer[0] = MISSION_ID;	//Satellite ID
+			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
 			Buffer[2] = num_config;	//Number of the packet
 			memcpy(&transformed, read_config, sizeof(transformed));
 			for (uint8_t i=3; i<CONFIG_PACKET_SIZE; i++){

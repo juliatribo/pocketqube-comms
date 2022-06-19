@@ -26,7 +26,6 @@
 #include "definitions.h"
 
 
-
 //#if defined( USE_BAND_868 )
 
 #define RF_FREQUENCY                                868000000 // Hz
@@ -83,6 +82,10 @@
 #define MEMORY_RX_SIZE								500
 
 #define TLE_PACKET_SIZE								66
+#define TELEMETRY_PACKET_SIZE						34
+#define CALIBRATION_PACKET_SIZE						96
+#define CONFIG_PACKET_SIZE							30
+
 
 
 /*!
@@ -200,9 +203,12 @@ void process_telecommand(uint8_t header, uint8_t info);
 
 bool pin_correct(uint8_t pin_1, uint8_t pin_2);
 
+void tx_beacon(void);
 
+void comms_timmer(void);
 
 
 
 
 #endif /* INC_COMMS_H_ */
+

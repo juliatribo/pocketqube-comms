@@ -16,6 +16,8 @@ Maintainer: Miguel Luis and Gregory Cristian
 #ifndef __GPIO_MCU_H__
 #define __GPIO_MCU_H__
 
+#include "stm32l4xx_it.h"
+
 /*!
  * \brief Initializes the given GPIO object
  *

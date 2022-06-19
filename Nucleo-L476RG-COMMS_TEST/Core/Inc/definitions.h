@@ -35,7 +35,7 @@
 #define LOW					03
 #define CRITICAL			04
 #define EXIT_LOW_POWER		05
-#define EXIT_SURVIVAL		06
+#define EXIT_CONTINGENCY	06
 #define EXIT_SUNSAFE		07
 #define SET_TIME			0x08
 
@@ -56,6 +56,7 @@
 #define SET_SF_CR			24
 //#define SET_CRC			25
 #define SEND_CALIBRATION	25
+#define CHANGE_TIMEOUT		26
 
 /*CAMARA*/
 #define TAKE_PHOTO 			30	/*Might rotate the PQ into the right position +
@@ -75,6 +76,7 @@
 
 #define ACK					60
 #define ERROR				65
+#define BEACON				68
 
 #define PIN1 				200	//Pin to avoid hacking telecommands
 #define PIN2				157	//Second byte of the PIN

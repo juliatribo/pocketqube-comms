@@ -5,22 +5,7 @@
  *      Author: Daniel Herencia Ruiz
  */
 
-
-
-/*
- / _____)             _              | |
-( (____  _____ ____ _| |_ _____  ____| |__
- \____ \| ___ |    (_   _) ___ |/ ___)  _ \
- _____) ) ____| | | || |_| ____( (___| | | |
-(______/|_____)_|_|_| \__)_____)\____)_| |_|
-    (C)2013 Semtech
-Description: CAD performance evaluation test
-License: Revised BSD License, see LICENSE.TXT file include in the project
-Maintainer: Benjamin Boulet
-*/
-
 #include "comms.h"
-
 
 typedef enum
 {
@@ -75,38 +60,55 @@ uint8_t testRX = false;
 /* FLAGS */
 uint8_t error_telecommand = false;
 uint8_t tx_flag = false;
+uint8_t beacon_flag = false;
+uint8_t nack_flag = false;	// Retransmission necessary
+
+uint8_t nack[WINDOW_SIZE];
+uint8_t nack_counter;
+
 
 /* FLAGS */
 uint8_t tle_telecommand = false;
 uint8_t telecommand_rx = false;
 uint8_t contact_GS = false; //To avoid TX beacon
 uint8_t request_execution = 0;
+uint8_t protocol_timeout = false;
 
-uint8_t paquet_to_send;
+uint8_t reception_ack_mode = false;
+uint16_t time_packets = 500;	//Time between packets in ms
+uint8_t num_config = 0;	//Configuration packet number
+
+/* LoRa PARAMETERS*/
+uint8_t SF = LORA_SPREADING_FACTOR;
+uint8_t CR = LORA_CODINGRATE;
+
+
+uint8_t packet_to_send;
 uint8_t last_telecommand[BUFFER_SIZE];	//Last telecommand RX
 uint8_t request_counter = 0;
-uint8_t paquet_number = 0;
-uint8_t window_paquet = 0;
+uint8_t packet_number = 0;	//The OBC should reset this value when new data from the payload replace the previous one
+uint8_t window_packet = 0;
 
 uint16_t rx_attemps_counter = 0;	//Instead of timeout with timers, counting iterations
 
 
 /* COUNTERS */
 uint8_t rtx_confirms = 0;	//Maximum 3 retransmissions of execution request
+uint8_t protocol_timeout_counter = 0;
 
 // VARIABLES FROM OLD CODE
-uint8_t calib_packets = 0;			//Counter of the calibration packets received
+/*uint8_t calib_packets = 0;			//Counter of the calibration packets received
 uint8_t tle_packets = 0;			//Counter of the tle packets received
 uint8_t telemetry_packets = 0;		//Counter of telemetry packets sent
 uint8_t count_packet[] = {0};		//To count how many packets have been sent (maximum WINDOW_SIZE)
 uint8_t count_window[] = {0};		//To count the window number
 uint8_t count_rtx[] = {0};			//To count the number of retransmitted packets
 uint8_t i=0;						//variable for loops
-uint8_t j=0;						//variable for loops
+uint8_t j=0;						//variable for loops*/
 uint8_t k=0;						//variable for loops
-uint64_t ack;						//Information rx in the ACK (0 => ack, 1 => nack)
+//uint64_t ack;						//Information rx in the ACK (0 => ack, 1 => nack)
 uint8_t nack_number;				//Number of the current packet to retransmit
-bool nack;							//True when retransmission necessary
+//bool nack;							//True when retransmission necessary
 bool full_window;					//Stop & wait => to know when we reach the limit packet of the window
 bool statemach = true;				//If true, comms workflow follows the state machine. This value should be controlled by OBC
 									//Put true before activating the statemachine thread. Put false before ending comms thread
@@ -120,6 +122,7 @@ bool contingency = false;			//True if we are in contingency state => only receiv
  */
 void StateMachine( void )
 {
+	/*
     uint16_t PacketCnt = 0, i=0;
     float Per = 0.0;
     uint16_t bucleCounter = 0;
@@ -133,8 +136,7 @@ void StateMachine( void )
     uint8_t compare_arrays = 0;
 
     States_t copy_state = State;	//ERASE AFTER FINISH TESTING
-    uint8_t reception_ack_mode = false;
-
+	*/
     // Target board initialization
     BoardInitMcu( );
     BoardInitPeriph( );
@@ -180,7 +182,7 @@ void StateMachine( void )
     while( 1 )
     {
 		//DelayMs( 300 );
-    	bucleCounter = bucleCounter + 1;
+    	//bucleCounter = bucleCounter + 1;
 
     	/*if (tx_non_stop == 1){
     		DelayMs( 300 );
@@ -189,7 +191,7 @@ void StateMachine( void )
     	}*/
     	DelayMs( 1 );
         Radio.IrqProcess( );
-        copy_state = State;
+        //copy_state = State;
         switch( State )
         {
             case RX_TIMEOUT:
@@ -234,6 +236,7 @@ void StateMachine( void )
 					if (pin_correct(Buffer[0], Buffer[1])){
 						State = LOWPOWER;
 						if (Buffer[2] == TLE){
+							Stop_timer_16();	//This is not necessary, put here for safety
 							if (!tle_telecommand){	//First TLE packet
 								tle_telecommand = true;
 								State = RX;
@@ -250,6 +253,7 @@ void StateMachine( void )
 							rx_attemps_counter = 0;
 							if (Buffer[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND. USE VARIABLE compare_arrays
 								//Buffer[2] == (SEND_DATA || SEND_TELEMETRY || ACK_DATA || SEND_CALIBRATION || SEND_CONFIG)
+								Stop_timer_16();
 								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG){
 									telecommand_rx = false;
 									process_telecommand(Buffer[2], Buffer[3]);
@@ -261,7 +265,8 @@ void StateMachine( void )
 								}
 							}
 							else if(Buffer[2] == ACK){	//Order execution ACK
-								rx_attemps_counter = 0;
+								//rx_attemps_counter = 0;
+								Stop_timer_16();
 								request_counter = 0;
 								request_execution = false;
 								reception_ack_mode = false;
@@ -273,6 +278,7 @@ void StateMachine( void )
 							    State = TX;
 							    telecommand_rx = false;
 							    error_telecommand = true;
+							    Stop_timer_16();
 							    DelayMs(10);
 							}
 						}
@@ -281,11 +287,14 @@ void StateMachine( void )
 							tle_telecommand = false;
 							telecommand_rx = true;
 							State = RX;
-							rx_attemps_counter = 0;
+							//rx_attemps_counter = 0;
+							DelayMs(10);
+							Start_timer_16();
 						}
 					} else{	//Pin not correct. If pin not correct it is assumed that the packet comes from another source. The protocol continues ignoring it
 					    State = TX;
 					    error_telecommand = true;
+					    Stop_timer_16();
 					    DelayMs(500);
 					}
                     PacketReceived = false;     // Reset flag
@@ -319,14 +328,14 @@ void StateMachine( void )
             	/* TO TEST TELECOMMANDS */
                 State = LOWPOWER;
             	if (error_telecommand){	//Send error message
-            		uint8_t paquet_to_send[] = {ERROR,ERROR,ERROR};
-            		Radio.Send(paquet_to_send,sizeof(paquet_to_send));
+            		uint8_t packet_to_send[] = {ERROR,ERROR,ERROR};
+            		Radio.Send(packet_to_send,sizeof(packet_to_send));
             		DelayMs(100);
-            		Radio.Send(paquet_to_send,sizeof(paquet_to_send));	//DISCOMMENT THIS LINE
+            		Radio.Send(packet_to_send,sizeof(packet_to_send));
                     error_telecommand = false;
             	} else if (request_execution){	//Send request for execute telecommand order
-            		//paquet_to_send = last_telecommand[2];
-            		//Radio.Send(paquet_to_send,1);
+            		//packet_to_send = last_telecommand[2];
+            		//Radio.Send(packet_to_send,1);
             		DelayMs(100);
             		Radio.Send(last_telecommand,3);	//TEST ONLY SENDING ONE REQUEST (NORMALLY PACKETS ARE TX IN PAIRS
             		//Radio.Send(last_telecommand,sizeof(last_telecommand));	//TEST ONLY SENDING ONE REQUEST (NORMALLY PACKETS ARE TX IN PAIRS
@@ -336,7 +345,9 @@ void StateMachine( void )
             		request_counter++;
             		reception_ack_mode = true;
             		State = RX;
-            		rx_attemps_counter = 0;
+            		//rx_attemps_counter = 0;
+            		Stop_timer_16();
+            		Start_timer_16();
             		//TimerStart(&CADTimeoutTimer);
             		//Radio.Rx( RX_TIMEOUT_VALUE );
             		//PacketReceived = false;
@@ -344,18 +355,32 @@ void StateMachine( void )
                     //txfunction( );
             		uint64_t read_photo[12];
             		uint8_t transformed[96];
-            		if (window_paquet < WINDOW_SIZE){
-            			Flash_Read_Data(SAVE_PHOTO+paquet_number*96, &read_photo, sizeof(read_photo));
+            		if (window_packet < WINDOW_SIZE){
+            			if (nack_flag){
+            				if (nack[nack_counter] != 0){
+            					Flash_Read_Data(DATA_ADDR + nack[nack_counter]*96, &read_photo, sizeof(read_photo));
+                    			Buffer[2] = nack[nack_counter];	//Number of the retransmitted packet
+                    			nack_counter++;
+            				} else{ //When all packets have been retransmitted, we continue with the next one
+            					nack_flag = false;
+            					nack_counter = 0;
+                				Flash_Read_Data(DATA_ADDR + packet_number*96, &read_photo, sizeof(read_photo));
+                    			Buffer[2] = packet_number;	//Number of the packet
+                    			packet_number++;
+            				}
+            			} else{
+            				Flash_Read_Data(DATA_ADDR + packet_number*96, &read_photo, sizeof(read_photo));
+                			Buffer[2] = packet_number;	//Number of the packet
+                			packet_number++;
+            			}
             			Buffer[0] = 0x86;	//Satellite ID
             			Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
-            			Buffer[2] = paquet_number;	//Number of the paquet
             			memcpy(&transformed, read_photo, sizeof(transformed));
             			for (uint8_t i=3; i<BUFFER_SIZE-1; i++){
             				Buffer[i] = transformed[i-3];
             			}
-            			Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the paquet indicator
-            			paquet_number++;
-            			window_paquet++;
+            			Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the packet indicator
+            			window_packet++;
             			State = TX;
                         DelayMs( 300 );
                         Radio.Send( Buffer, BUFFER_SIZE );
@@ -363,10 +388,16 @@ void StateMachine( void )
             			tx_non_stop = false;
             			tx_flag = false;
             			send_data = false;
-            			window_paquet = 0;
+            			window_packet = 0;
             			State = RX;
             		}
                     DelayMs( 200 );
+            	} else if (beacon_flag){
+					uint8_t packet_to_send[] = {BEACON,BEACON,BEACON};
+					Radio.Send(packet_to_send,sizeof(packet_to_send));
+					DelayMs(100);
+					Radio.Send(packet_to_send,sizeof(packet_to_send));
+					beacon_flag = false;
             	}
 
             	/* TO TEST PROTOCOL AND SWITCHING BETWEEN STATES
@@ -393,7 +424,7 @@ void StateMachine( void )
             }
             case LOWPOWER:
             default:
-            	defaultCounter = defaultCounter + 1;
+            	//defaultCounter = defaultCounter + 1;
                 //State = RX;
             	if (tx_non_stop || error_telecommand || tx_flag){
 					State = TX;
@@ -409,11 +440,13 @@ void StateMachine( void )
             				telecommand_rx = false;
             				State = TX;
             				request_counter=0;
-            				rx_attemps_counter=0;
-            			} else if (rx_attemps_counter >= 160){	//TX another request execution
+            				//rx_attemps_counter=0;
+            				Stop_timer_16();
+            			} else if (protocol_timeout){	//TX another request execution
+            				protocol_timeout = false;
             				State = TX;
             			} else {	//Iterate till 500 ms approx
-            				rx_attemps_counter++;
+            				//rx_attemps_counter++;
             				State = RX;
             			}
             			/*State = TX;*/// IN THE CASE OF RETRANSMISSIONS OF REQUEST
@@ -430,13 +463,19 @@ void StateMachine( void )
             			rx_attemps_counter++;
 
             			/*Check the 160 value with the whole code and multithread, because maybe induce a delay*/
-            			if (rx_attemps_counter >= 160){	//With this value all 2nd telecommand that arrive before 650 ms are received. 700 ms or more error paquet is send
+            			if (protocol_timeout){	//With this value all 2nd telecommand that arrive before 650 ms are received. 700 ms or more error packet is send
             				PacketReceived = true;
-            				rx_attemps_counter = 0;
+            				protocol_timeout = false;
+            				//rx_attemps_counter = 0;
+            				DelayMs(1);
+            				Stop_timer_16();
             			}
 						State = RX; //If Timeout passes and the 2nd telecommand is not received, goes to RX and will process the first, as if the second has been RX
 						//PacketReceived = true;
 					}
+            	}
+            	else if (beacon_flag){
+            		State = TX;
             	}
             	else{
             		State = RX;
@@ -453,38 +492,57 @@ void StateMachine( void )
 
 }
 
+void tx_beacon(void){
+	if (State == RX || State == LOWPOWER){
+		if (!reception_ack_mode && !tle_telecommand && !telecommand_rx){
+			State = TX;
+			beacon_flag = true;
+		}
+	}
+}
+
+void comms_timmer(void){
+	if (protocol_timeout_counter >= SF - 7){	//Timeout proportional to SF (high SF require more time)
+		protocol_timeout = true;
+		protocol_timeout_counter = 0;
+	} else{
+		protocol_timeout_counter = protocol_timeout_counter + 1;
+	}
+}
+
+/*
 void txfunction( void ){
 	uint64_t read_photo[12];
 	uint8_t transformed[96];
-	if (window_paquet < WINDOW_SIZE){
-		Flash_Read_Data(SAVE_PHOTO+paquet_number*96, &read_photo, sizeof(read_photo));
+	if (window_packet < WINDOW_SIZE){
+		Flash_Read_Data(SAVE_PHOTO+packet_number*96, &read_photo, sizeof(read_photo));
 		Buffer[0] = 0x86;	//Satellite ID
 		Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
-		Buffer[2] = paquet_number;	//Number of the paquet
+		Buffer[2] = packet_number;	//Number of the packet
 		memcpy(&transformed, read_photo, sizeof(transformed));
 		for (uint8_t i=3; i<BUFFER_SIZE-1; i++){
 			Buffer[i] = transformed[i-3];
 		}
-		Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the paquet indicator
-		paquet_number++;
-		window_paquet++;
+		Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the packet indicator
+		packet_number++;
+		window_packet++;
 		State = TX;
 	} else{
 		tx_non_stop = false;
 		tx_flag = false;
 		send_data = false;
-		window_paquet = 0;
+		window_packet = 0;
 		State = RX;
 	}
-	/*for (uint8_t i = 0; i<BUFFER_SIZE; i=i+1){
-		Buffer[i] = Memory[i+txCounter*BUFFER_SIZE];
-	}
-	txCounter = txCounter + 1;
-	if (MEMORY_SIZE < ( txCounter*BUFFER_SIZE + BUFFER_SIZE )){
-		txCounter = 0;
-		tx_non_stop = 0;
-	}*/
-}
+	//for (uint8_t i = 0; i<BUFFER_SIZE; i=i+1){
+	//	Buffer[i] = Memory[i+txCounter*BUFFER_SIZE];
+	//}
+	//txCounter = txCounter + 1;
+	//if (MEMORY_SIZE < ( txCounter*BUFFER_SIZE + BUFFER_SIZE )){
+	//	txCounter = 0;
+	//	tx_non_stop = 0;
+	//}
+}*/
 
 void OnTxDone( void )
 {
@@ -620,84 +678,79 @@ bool pin_correct(uint8_t pin_1, uint8_t pin_2) {
  *                                                                                    *
  **************************************************************************************/
 void process_telecommand(uint8_t header, uint8_t info) {
-	uint64_t info_write;
+	uint64_t info_write;	//Flash_Write_Data functions requires uint64_t variables (64 bits) or arrays
 	switch(header) {
-	case RESET2:
+	case RESET2:{
 		HAL_NVIC_SystemReset();
 		break;
-	case NOMINAL:
+	}
+	case NOMINAL:{
 		info_write = info;
-		Flash_Write_Data(TEST_ADDRESS, &info_write, 1);
-		info_write = Buffer[99];
-		Flash_Write_Data(TEST_ADDRESS+0x08, &info_write, 1);
-		break;
-	case LOW:
-		Flash_Write_Data(TEST_ADDRESS, &info, 1);
-		break;
-	case CRITICAL:
-		Flash_Write_Data(TEST_ADDRESS, &info, 1);
-		break;
-	case EXIT_LOW_POWER:{
-		Flash_Write_Data(EXIT_LOW_POWER_FLAG_ADDR, &info, 1);
-		Flash_Write_Data(EXIT_LOW_ADDR, TRUE, 1);
+		Flash_Write_Data(NOMINAL_ADDR, &info_write, 1);
+		//xTaskNotify("Task OBC", NOMINAL_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
-	case EXIT_SURVIVAL:{
-		Flash_Write_Data(EXIT_LOW_POWER_FLAG_ADDR, &info, 1);
-		//Flash_Write_Data(EXIT_SURVIVAL, TRUE, 1);
+	case LOW:{
+		info_write = info;
+		Flash_Write_Data(LOW_ADDR, &info_write, 1);
+		//xTaskNotify("Task OBC", LOW_NOTI, eSetBits); //Notification to OBC
+		break;
+	}
+	case CRITICAL:{
+		info_write = info;
+		Flash_Write_Data(CRITICAL_ADDR, &info_write, 1);
+		//xTaskNotify("Task OBC", CRITICAL_NOTI, eSetBits); //Notification to OBC
+		break;
+	}
+	case EXIT_LOW_POWER:{
+		//xTaskNotify("Task OBC", EXIT_LOW_POWER_NOTI, eSetBits); //Notification to OBC
+		break;
+	}
+	case EXIT_CONTINGENCY:{
+		//xTaskNotify("Task OBC", EXIT_CONTINGENCY_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
 	case EXIT_SUNSAFE:{
-		Flash_Write_Data(EXIT_LOW_POWER_FLAG_ADDR, &info, 1);
-		//Flash_Write_Data(EXIT_SUNSAFE, TRUE, 1);
+		//xTaskNotify("Task OBC", EXIT_SUNSAFE_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
 	case SET_TIME:{
 		uint8_t time[4];
 		for (k=0; k<4; k++){
-			time[k]=Buffer[k+1];
+			time[k]=Buffer[k+3];
 		}
-		Flash_Write_Data(TEMP_ADDR, &time, sizeof(time));
+		Flash_Write_Data(TIME_ADDR, &time, sizeof(time));
+		//xTaskNotify("Task OBC", SETTIME_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
-	case SET_CONSTANT_KP:
-		Flash_Write_Data(KP_ADDR, &info, 1);
+	case SET_CONSTANT_KP:{
+		info_write = info;
+		Flash_Write_Data(KP_ADDR, &info_write, 1);
+		//xTaskNotify("Task OBC", CTEKP_NOTI, eSetBits); //Notification to OBC
 		break;
+	}
 	case TLE:{
-		/*
 		uint8_t tle[TLE_PACKET_SIZE];
 		for (k=0; k<TLE_PACKET_SIZE; k++){
 			tle[k]=Buffer[k+3];
 		}
-		Flash_Write_Data(TEST_ADDRESS2 + tle_packets*(TLE_PACKET_SIZE), &tle, sizeof(tle));
-		if (tle_packets > 0){
-			tle_packets = 0;
-		}else{
-			tle_packets++;
-		}*/
-		//SEE WHY THE PREVIOUS CODE DOES NOT WORKS
-		if (tle_packets == 0){
-			uint8_t tle[TLE_PACKET_SIZE];
-			for (k=0; k<TLE_PACKET_SIZE; k++){
-				tle[k]=Buffer[k+3];
-			}
-			Flash_Write_Data(TEST_ADDRESS2 + tle_packets*(TLE_PACKET_SIZE), &tle, sizeof(tle));
-			tle_packets++;
+		if (tle_telecommand){
+			Flash_Write_Data(TLE_ADDR1, &tle, sizeof(tle));
+			//tle_packets++;
 		} else{
-			uint8_t tle2[TLE_PACKET_SIZE];
-			for (k=0; k<TLE_PACKET_SIZE; k++){
-				tle2[k]=Buffer[k+3];
-			}
-			Flash_Write_Data(TEST_ADDRESS2 + tle_packets*(TLE_PACKET_SIZE), &tle2, sizeof(tle2));
-			tle_packets++;
-			tle_packets = 0;
+			Flash_Write_Data(TLE_ADDR2, &tle, sizeof(tle));
+			//tle_packets = 0;
 		}
+		//xTaskNotify("Task OBC", TLE_NOTI, eSetBits); //Notification to OBC
+		break;
+		//For high SF 3 packets will be needed and the code should be adjusted
+	}
+	case SET_GYRO_RES:{
+		info_write = info;
+		Flash_Write_Data(GYRO_RES_ADDR, &info_write, 1);
+		//xTaskNotify("Task OBC", GYRORES_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
-	case SET_GYRO_RES:
-		/*4 possibles estats, rebrem 00/01/10/11*/
-		Flash_Write_Data(GYRO_RES_ADDR, &info, 1);
-		break;
 	case SEND_DATA:{
 		if (!contingency){
 			tx_flag = true;	//Activates TX flag
@@ -707,82 +760,112 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		break;
 	}
 	case SEND_TELEMETRY:{
-		/* SEND TELEMETRY DIRECTLY FROM HERE WITH RADIO.SEND */
+		uint64_t read_telemetry[5];
+		uint8_t transformed[TELEMETRY_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
 		if (!contingency){
-			send_telemetry = true;
-			num_telemetry = (uint8_t) 34/BUFFER_SIZE + 1; //cast to integer to erase the decimal part
-			//State = TX;
+			Flash_Read_Data(TELEMETRY_ADDR, &read_telemetry, sizeof(read_telemetry));
+			Buffer[0] = 0x86;	//Satellite ID
+			Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
+			Buffer[2] = num_telemetry;	//Number of the packet
+			memcpy(&transformed, read_telemetry, sizeof(transformed));
+			for (uint8_t i=3; i<TELEMETRY_PACKET_SIZE; i++){
+				Buffer[i] = transformed[i-3];
+			}
+			Buffer[TELEMETRY_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator
+			num_telemetry++;
+            DelayMs( 300 );
+            Radio.Send( Buffer, TELEMETRY_PACKET_SIZE+4 );
+			State = RX;
 		}
 		break;
 	}
 	case STOP_SENDING_DATA:{
+		tx_flag = false;	//Activates TX flag
+		State = RX;
 		send_data = false;
-		count_packet[0] = 0;
 		break;
 	}
 	case ACK_DATA:{
-		//check it
-	 	 ack = ack & Buffer[1];
-		 for(j=2; j<ACK_PAYLOAD_LENGTH; j++){
-			 ack = (ack << 8*j) & Buffer[j];
-		 }
-		 count_window[0] = 0;
-		 full_window = false;
-		 if (ack != 0xFFFFFFFFFFFFFFFF){
-			 nack = true;
-		 }
-		 //State = TX;
+		if (!contingency && info != 0){
+			nack_flag = true;
+			memcpy(&nack, Buffer[3], sizeof(nack));
+			tx_flag = true;	//Activates TX flag
+			State = TX;
+			send_data = true;
+		}
 		break;
 	}
 	case SET_SF_CR: {
-		uint8_t SF;
 		if (info == 0) SF = 7;
 		else if (info == 1) SF = 8;
 		else if (info == 2) SF = 9;
 		else if (info == 3) SF = 10;
 		else if (info == 4) SF = 11;
 		else if (info == 5) SF = 12;
-		Flash_Write_Data(SF_ADDR, &SF, 1);
+		info_write = SF;
+		Flash_Write_Data(SF_ADDR, &info_write, 1);
 		/*4 cases (4/5, 4/6, 4/7,1/2), so we will receive and store 0, 1, 2 or 3*/
-		Flash_Write_Data(CRC_ADDR, &Buffer[2], 1);
+		info_write = Buffer[4];
+		Flash_Write_Data(CRC_ADDR, &info_write, 1);
+		DelayMs(10);
 		break;
 	}
-	case SEND_CALIBRATION:{	//Rx calibration
-		/* RX OR SEND???? */
-		/* IT TX, IT CAN BE DONE WITH ONE PACKET DIRECTLY FROM HERE RADIO.SEND */
-		uint8_t calib[UPLINK_BUFFER_SIZE-1];
-		for (k=1; k<UPLINK_BUFFER_SIZE; k++){
-			calib[k-1]=Buffer[k];
+	case SEND_CALIBRATION:{
+		/* CALIBRATION PACKET RECEIVED */
+		uint8_t calibration_packet[CALIBRATION_PACKET_SIZE];
+		for (k=0; k<CALIBRATION_PACKET_SIZE; k++){
+			calibration_packet[k]=Buffer[k+3];
 		}
-		Flash_Write_Data(CALIBRATION_ADDR, &calib, sizeof(calib));
-		calib_packets = calib_packets + 1;
-		uint8_t integer_part = (uint8_t) 138/UPLINK_BUFFER_SIZE;
-		if(calib_packets == integer_part+1){
-			calib_packets = 0;
-		}
+		Flash_Write_Data(CALIBRATION_ADDR, &calibration_packet, sizeof(calibration_packet));
+		//xTaskNotify("Task OBC", CALIBRATION_NOTI, eSetBits); //Notification to OBC
+		break;
+		//For high SF 2 packets will be needed and the code should be adjusted
+	}
+	case CHANGE_TIMEOUT:{
+		memcpy(&time_packets, Buffer[3], 2);
+		Flash_Write_Data(COMMS_TIME_ADDR, &time_packets, sizeof(time_packets));
 		break;
 	}
 	case TAKE_PHOTO:{
-		/*GUARDAR TEMPS FOTO?*/
-		Flash_Write_Data(PAYLOAD_STATE_ADDR, TRUE, 1);
-		Flash_Write_Data(PL_TIME_ADDR, &info, 4);
-		Flash_Write_Data(PHOTO_RESOL_ADDR, &Buffer[5], 1);
-		Flash_Write_Data(PHOTO_COMPRESSION_ADDR, &Buffer[6], 1);
+		Flash_Write_Data(PL_TIME_ADDR, &Buffer[3], 4);
+		info_write = Buffer[7];
+		Flash_Write_Data(PHOTO_RESOL_ADDR, &info_write, 1);
+		info_write = Buffer[8];
+		Flash_Write_Data(PHOTO_COMPRESSION_ADDR, &info_write, 1);
+		//xTaskNotify("Task OBC", TAKEPHOTO_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
 	case TAKE_RF:{
-		Flash_Write_Data(PAYLOAD_STATE_ADDR, TRUE, 1);
-		Flash_Write_Data(PL_TIME_ADDR, &info, 8);
-		Flash_Write_Data(F_MIN_ADDR, &Buffer[9], 1);
-		Flash_Write_Data(F_MAX_ADDR, &Buffer[10], 1);
-		Flash_Write_Data(DELTA_F_ADDR, &Buffer[11], 1);
-		Flash_Write_Data(INTEGRATION_TIME_ADDR, &Buffer[12], 1);
+		Flash_Write_Data(PL_TIME_ADDR, &Buffer[3], 8);
+		info_write = Buffer[11];
+		Flash_Write_Data(F_MIN_ADDR, &info_write, 1);
+		info_write = Buffer[12];
+		Flash_Write_Data(F_MAX_ADDR, &info_write, 1);
+		info_write = Buffer[13];
+		Flash_Write_Data(DELTA_F_ADDR, &info_write, 1);
+		info_write = Buffer[14];
+		Flash_Write_Data(INTEGRATION_TIME_ADDR, &info_write, 1);
+		//xTaskNotify("Task OBC", TAKERF_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
 	case SEND_CONFIG:{
-		uint8_t config[CONFIG_SIZE];
-		Flash_Read_Data(CONFIG_ADDR, &config, CONFIG_SIZE);
-		Radio.Send( config, CONFIG_SIZE );
+		uint64_t read_config[4];
+		uint8_t transformed[CONFIG_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
+		if (!contingency){
+			Flash_Read_Data(CONFIG_PACKET_SIZE, &read_config, sizeof(read_config));
+			Buffer[0] = 0x86;	//Satellite ID
+			Buffer[1] = 0x64;	//Poquetcube ID (there are at least 3)
+			Buffer[2] = num_config;	//Number of the packet
+			memcpy(&transformed, read_config, sizeof(transformed));
+			for (uint8_t i=3; i<CONFIG_PACKET_SIZE; i++){
+				Buffer[i] = transformed[i-3];
+			}
+			Buffer[CONFIG_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator
+			num_config++;
+            DelayMs( 300 );
+            Radio.Send( Buffer, CONFIG_PACKET_SIZE+4 );
+			State = RX;
+		}
 		break;
 	}
 	default:{

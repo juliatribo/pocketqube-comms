@@ -298,7 +298,7 @@ void EXTI9_5_IRQHandler( void )
     HAL_GPIO_EXTI_IRQHandler( GPIO_PIN_9 );
 }
 
-void EXTI15_10_IRQHandler( void )
+/*void EXTI15_10_IRQHandler( void )
 {
 #if !defined( USE_NO_TIMER )
     RtcRecoverMcuStatus( );
@@ -310,7 +310,7 @@ void EXTI15_10_IRQHandler( void )
     HAL_GPIO_EXTI_IRQHandler( GPIO_PIN_14 );
     HAL_GPIO_EXTI_IRQHandler( GPIO_PIN_15 );
 }
-
+*/
 void HAL_GPIO_EXTI_Callback( uint16_t gpioPin )
 {
     uint8_t callbackIndex = 0;

@@ -31,8 +31,8 @@
 #define NOMINAL_ADDR 				0x08008004
 #define LOW_ADDR 					0x08008005
 #define CRITICAL_ADDR 				0x08008006
-#define EXIT_LOW_ADDR 				0x08008007
-#define SET_TIME_ADDR				0x08008008 	//4 bytes (GS -> RTC)
+//#define EXIT_LOW_ADDR 				0x08008007
+#define TIME_ADDR					0x08008008 	//4 bytes (GS -> RTC)
 #define RTC_TIME_ADDR				0x0800800C	//4 bytes (RTC -> Unix) Get from the RTC
 //CONFIGURATION ADDRESSES
 #define CONFIG_ADDR 				0x08008010
@@ -47,8 +47,11 @@
 #define DELTA_F_ADDR 				0x0800801A
 #define INTEGRATION_TIME_ADDR 		0x0800801C
 
-#define TLE_ADDR 					0x08008020 // 138 bytes
+#define TLE_ADDR1 					0x08008020 // 138 bytes
+#define TLE_ADDR2 					0x08008065 // 138 bytes
 #define EXIT_LOW_POWER_FLAG_ADDR 	0x080080AA
+
+#define COMMS_TIME_ADDR				0x0800E860 // Time between packets
 
 //CALIBRATION ADDRESSES
 #define CALIBRATION_ADDR			0x080080AB
@@ -56,6 +59,8 @@
 #define MAGNETO_OFFSET_ADDR			0x080080CF // 11 bytes
 #define GYRO_POLYN_ADDR 			0x080080DB // 23 bytes
 #define PHOTODIODES_OFFSET_ADDR 	0x080080F3 // 12 bytes
+
+#define DATA_ADDR					0x08010000
 
 //TELEMETRY ADDRESSES
 #define TELEMETRY_ADDR				0x08008100

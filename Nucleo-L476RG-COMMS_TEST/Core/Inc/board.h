@@ -37,6 +37,7 @@ Maintainer: Miguel Luis and Gregory Cristian
 
 #include "uart-board.h"
 
+#include "stm32l4xx_it.h"
 /*!
  * Generic definition
  */

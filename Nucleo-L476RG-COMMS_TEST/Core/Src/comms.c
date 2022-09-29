@@ -206,14 +206,12 @@ void StateMachine( void )
     uint16_t tx_count = 0;
 
     uint8_t compare_arrays = 0;
-
-    States_t copy_state = State;	//ERASE AFTER FINISH TESTING
 	*/
-    // Target board initialization
+    /* Target board initialization*/
     BoardInitMcu( );
     BoardInitPeriph( );
 
-    // Radio initialization
+    /* Radio initialization */
     RadioEvents.TxDone = OnTxDone;
     RadioEvents.RxDone = OnRxDone;
     RadioEvents.TxTimeout = OnTxTimeout;
@@ -221,20 +219,20 @@ void StateMachine( void )
     RadioEvents.RxError = OnRxError;
     RadioEvents.CadDone = OnCadDone;
 
-    //Timer used to restart the CAD
+    /* Timer used to restart the CAD */
     TimerInit( &CADTimeoutTimer, CADTimeoutTimeoutIrq );
     TimerSetValue( &CADTimeoutTimer, CAD_TIMER_TIMEOUT );
 
-    //App timmer used to check the RX's end
+    /* App timmer used to check the RX's end */
     TimerInit( &RxAppTimeoutTimer, RxTimeoutTimerIrq );
     TimerSetValue( &RxAppTimeoutTimer, RX_TIMER_TIMEOUT );
 
-    Radio.Init( &RadioEvents );
+    Radio.Init( &RadioEvents );    //Initializes the Radio
 
-    configuration();
+    configuration();               //Configures the transceiver
 
     //while(  i < NB_TRY )
-    while( 1 )
+    while( 1 )                     //The only option to end the state machine is killing COMMS thread (by the OBC)
     {
 		//DelayMs( 300 );
     	//bucleCounter = bucleCounter + 1;
@@ -245,7 +243,7 @@ void StateMachine( void )
     		DelayMs( 1 );
     	}*/
     	DelayMs( 1 );
-        Radio.IrqProcess( );
+        Radio.IrqProcess( );       //Checks the interruptions
         //copy_state = State;
         switch( State )
         {
@@ -660,8 +658,8 @@ void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
     Radio.Standby( );
     uint16_t BufferSize = size;
     memcpy( Buffer, payload, BufferSize );
-    uint8_t RXactual[BufferSize];
-    memcpy( RXactual, payload, BufferSize );
+    //uint8_t RXactual[BufferSize];
+    //memcpy( RXactual, payload, BufferSize );
     RssiValue = rssi;
     SnrValue = snr;
     PacketReceived = true;

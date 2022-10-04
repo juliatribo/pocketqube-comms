@@ -138,13 +138,15 @@ void configuration(void){
 
 
 	/* Reads the SF, CR and time between packets variables from memory */
-	Read_Flash(SF_ADDR, &read_variable, 1);
+	/*Read_Flash(SF_ADDR, &read_variable, 1);
 	memcpy(SF, read_variable, sizeof(SF));
 	Read_Flash(CRC_ADDR, &read_variable, 1);
 	memcpy(CR, read_variable, sizeof(CR));
 	Read_Flash(COMMS_TIME_ADDR, &read_variable, 1);
-	memcpy(time_packets, read_variable, sizeof(time_packets));
-
+	memcpy(time_packets, read_variable, sizeof(time_packets));*/
+	SF = LORA_SPREADING_FACTOR;
+	CR = LORA_CODINGRATE;
+	time_packets = 500;
 
 	/* Configuration of the LoRa frequency and TX and RX parameters */
     Radio.SetChannel( RF_FREQUENCY );

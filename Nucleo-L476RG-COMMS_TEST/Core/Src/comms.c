@@ -19,7 +19,6 @@
 
 #include "comms.h"
 
-
 /************  STATES  *************/
 
 typedef enum                        //Possible States of the State Machine
@@ -63,6 +62,7 @@ uint8_t request_execution = false;  //To send the request execution packet
 uint8_t protocol_timeout = false;   //True when the protocol timer ends
 uint8_t reception_ack_mode = false; //True
 uint8_t contingency = false;        //True if we are in contingency state (only RX allowed)
+uint8_t ask_others_flag = false;	//True if GS tells to ask other satellites
 
 
 /***********  COUNTERS  ***********/
@@ -309,7 +309,7 @@ void StateMachine( void )
 							if (Buffer[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND. USE VARIABLE compare_arrays
 								//Buffer[2] == (SEND_DATA || SEND_TELEMETRY || ACK_DATA || SEND_CALIBRATION || SEND_CONFIG)
 								Stop_timer_16();
-								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG){
+								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG || Buffer[2] == ASK_OTHERS){
 									telecommand_rx = false;
 									process_telecommand(Buffer[2], Buffer[3]);
 								}
@@ -408,7 +408,24 @@ void StateMachine( void )
             		//TimerStart(&CADTimeoutTimer);
             		//Radio.Rx( RX_TIMEOUT_VALUE );
             		//PacketReceived = false;
-            	} else if (tx_flag){	//Send data
+            	}
+            	else if(ask_others_flag){
+
+            		Buffer[0] = MISSION_ID;	//Satellite ID
+					Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
+
+        			for (uint8_t i=2; i<BUFFER_SIZE-1; i++){
+        				Buffer[i] = 0x0D;
+        			}
+        			Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the packet indicator
+
+					Radio.Send( Buffer, BUFFER_SIZE );
+					DelayMs( (uint16_t) time_packets*3/5 );
+					Radio.Send( Buffer, BUFFER_SIZE );
+					ask_others_flag = false;
+					State = RX;
+
+            	}else if (tx_flag){	//Send data
                     //txfunction( );
             		uint64_t read_photo[12];
             		uint8_t transformed[96];
@@ -425,7 +442,7 @@ void StateMachine( void )
                     			Buffer[2] = packet_number;	//Number of the packet
                     			packet_number++;
             				}
-            			} else{
+            			} else {
             				Flash_Read_Data(DATA_ADDR + packet_number*96, &read_photo, sizeof(read_photo));
                 			Buffer[2] = packet_number;	//Number of the packet
                 			packet_number++;
@@ -451,7 +468,9 @@ void StateMachine( void )
             		}
                     //DelayMs( 200 );
             		DelayMs( (uint16_t) time_packets*2/5 );
-            	} else if (beacon_flag){
+            	}
+
+            	else if (beacon_flag){
 					uint8_t packet_to_send[] = {MISSION_ID,POCKETQUBE_ID,BEACON};
 					Radio.Send(packet_to_send,sizeof(packet_to_send));
 					DelayMs(100);
@@ -942,6 +961,13 @@ void process_telecommand(uint8_t header, uint8_t info) {
             DelayMs( 300 );
             Radio.Send( Buffer, TELEMETRY_PACKET_SIZE+4 );
 			State = RX;
+		}
+		break;
+	}
+	case ASK_OTHERS:{
+		if (!contingency){
+			State = TX;
+			ask_others_flag = true; 	// activate ask others flag
 		}
 		break;
 	}

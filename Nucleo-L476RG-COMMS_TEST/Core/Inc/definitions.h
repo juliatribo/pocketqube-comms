@@ -54,6 +54,10 @@
 #define STOP_SENDING_DATA  	22
 #define ACK_DATA  			23	/*It is received when all the data is received correctly*/
 #define SET_SF_CR			24
+#define ASK_OTHERS 			60	//This command is sent from GS asking the satellite to ask other satellites for information
+#define ASKED_BY_OTHER		61	//This command is sent from another satellite asking for information
+
+
 //#define SET_CRC			25
 #define SEND_CALIBRATION	25
 #define CHANGE_TIMEOUT		26

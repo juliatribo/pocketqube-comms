@@ -41,7 +41,6 @@ typedef enum                        //CAD states
 
 States_t State = LOWPOWER;          //Current state of the State Machine
 
-
 /************  PACKETS  ************/
 
 uint8_t Buffer[BUFFER_SIZE];        //Tx and Rx Buffer
@@ -62,7 +61,9 @@ uint8_t request_execution = false;  //To send the request execution packet
 uint8_t protocol_timeout = false;   //True when the protocol timer ends
 uint8_t reception_ack_mode = false; //True
 uint8_t contingency = false;        //True if we are in contingency state (only RX allowed)
-uint8_t ask_others_flag = false;	//True if GS tells to ask other satellites
+uint8_t ask_data = false;			//True if GS asks to ask another sat the data
+uint8_t isGS = true;				//True if telecommand is sent by GS, false if telecommand is sent by another sat
+
 
 
 /***********  COUNTERS  ***********/
@@ -288,7 +289,8 @@ void StateMachine( void )
 						tx_non_stop = 1;
 						DelayMs(1000);
 					}*/
-					if (pin_correct(Buffer[0], Buffer[1])){
+					if (pin_correct(Buffer[0], Buffer[1]))
+					{
 						State = LOWPOWER;
 						if (Buffer[2] == TLE){
 							Stop_timer_16();	//This is not necessary, put here for safety
@@ -309,7 +311,7 @@ void StateMachine( void )
 							if (Buffer[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND. USE VARIABLE compare_arrays
 								//Buffer[2] == (SEND_DATA || SEND_TELEMETRY || ACK_DATA || SEND_CALIBRATION || SEND_CONFIG)
 								Stop_timer_16();
-								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG || Buffer[2] == ASK_OTHERS){
+								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG || Buffer[2] == ASK_DATA){
 									telecommand_rx = false;
 									process_telecommand(Buffer[2], Buffer[3]);
 								}
@@ -348,7 +350,8 @@ void StateMachine( void )
 							DelayMs(10);
 							Start_timer_16();
 						}
-					} else{	//Pin not correct. If pin not correct it is assumed that the packet comes from another source. The protocol continues ignoring it
+					}
+					else{	//Pin not correct. If pin not correct it is assumed that the packet comes from another source. The protocol continues ignoring it
 					    State = TX;
 					    error_telecommand = true;
 					    Stop_timer_16();
@@ -409,20 +412,16 @@ void StateMachine( void )
             		//Radio.Rx( RX_TIMEOUT_VALUE );
             		//PacketReceived = false;
             	}
-            	else if(ask_others_flag){
+            	else if(ask_data){
 
             		Buffer[0] = MISSION_ID;	//Satellite ID
 					Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
-
-        			for (uint8_t i=2; i<BUFFER_SIZE-1; i++){
-        				Buffer[i] = 0x0D;
-        			}
-        			Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the packet indicator
+					Buffer[2] =  SEND_DATA; //ID del telecommand de send_data
 
 					Radio.Send( Buffer, BUFFER_SIZE );
 					DelayMs( (uint16_t) time_packets*3/5 );
 					Radio.Send( Buffer, BUFFER_SIZE );
-					ask_others_flag = false;
+					ask_data = false;
 					State = RX;
 
             	}else if (tx_flag){	//Send data
@@ -843,6 +842,11 @@ static void RxTimeoutTimerIrq( void )
  *************************************************************************/
 bool pin_correct(uint8_t pin_1, uint8_t pin_2) {
 	if (pin_1 == PIN1 && pin_2 == PIN2){
+		isGS = true;
+		return true;
+	}
+	else if (pin_1 == MISSION_ID && pin_2 == POQUETQUBE_ID2){
+		isGS = false;
 		return true;
 	}
 	return false;
@@ -964,10 +968,10 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		}
 		break;
 	}
-	case ASK_OTHERS:{
+	case ASK_DATA:{
 		if (!contingency){
 			State = TX;
-			ask_others_flag = true; 	// activate ask others flag
+			ask_data = true; 	// activate ask others flag
 		}
 		break;
 	}

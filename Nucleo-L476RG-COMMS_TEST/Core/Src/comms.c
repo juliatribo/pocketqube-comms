@@ -470,11 +470,32 @@ void StateMachine( void )
             	}
 
             	else if (beacon_flag){
-					uint8_t packet_to_send[] = {MISSION_ID,POCKETQUBE_ID,BEACON};
-					Radio.Send(packet_to_send,sizeof(packet_to_send));
-					DelayMs(100);
-					Radio.Send(packet_to_send,sizeof(packet_to_send));
-					beacon_flag = false;
+					//uint8_t packet_to_send[] = {MISSION_ID,POCKETQUBE_ID,BEACON};
+					//Radio.Send(packet_to_send,sizeof(packet_to_send));
+					//DelayMs(100);
+					//Radio.Send(packet_to_send,sizeof(packet_to_send));
+					//beacon_flag = false;
+
+					uint64_t read_telemetry[5];
+					uint8_t transformed[TELEMETRY_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
+					            		if (!contingency){
+					            			Flash_Read_Data(TELEMETRY_ADDR, &read_telemetry, sizeof(read_telemetry));
+					            			Buffer[0] = MISSION_ID;	//Satellite ID
+					            			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
+					           				Buffer[2] = num_telemetry;	//Number of the packet
+					        				memcpy(&transformed, read_telemetry, sizeof(transformed));
+					            			for (uint8_t i=3; i<TELEMETRY_PACKET_SIZE; i++){
+					            				Buffer[i] = transformed[i-3];
+					            			}
+					            			Buffer[TELEMETRY_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator
+					            			num_telemetry++;
+					            		    DelayMs( 300 );
+					            		    Radio.Send( Buffer, TELEMETRY_PACKET_SIZE+4 );
+					            			State = RX;
+					            		}
+
+					            		beacon_flag = false;
+
             	}
 
             	/* TO TEST PROTOCOL AND SWITCHING BETWEEN STATES
@@ -1049,7 +1070,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		uint64_t read_config[4];
 		uint8_t transformed[CONFIG_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
 		if (!contingency){
-			Flash_Read_Data(CONFIG_PACKET_SIZE, &read_config, sizeof(read_config));
+			Flash_Read_Data(CONFIG_ADDR, &read_config, sizeof(read_config));
 			Buffer[0] = MISSION_ID;	//Satellite ID
 			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
 			Buffer[2] = num_config;	//Number of the packet

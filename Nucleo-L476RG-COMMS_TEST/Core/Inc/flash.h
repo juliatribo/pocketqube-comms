@@ -85,6 +85,11 @@
 
 #define SAVE_PHOTO					0x08010000
 
+// FLAG ADDRESS
+#define FLAG_ADDR					0x0800810C
+
+#define TIMEOUT_ADDR 				0x08008204 // 2 bytes
+
 uint32_t Flash_Write_Data(uint32_t Address, uint64_t *Data_write, uint16_t numberofbytes);
 
 void Write_Flash(uint32_t StartSectorAddress, uint64_t *Data, uint16_t numberofbytes);

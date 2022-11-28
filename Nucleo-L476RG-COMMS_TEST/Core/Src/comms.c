@@ -18,6 +18,7 @@
 
 
 #include "comms.h"
+#include "utils.h"
 
 /************  STATES  *************/
 
@@ -311,7 +312,7 @@ void StateMachine( void )
 							if (Buffer[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND. USE VARIABLE compare_arrays
 								//Buffer[2] == (SEND_DATA || SEND_TELEMETRY || ACK_DATA || SEND_CALIBRATION || SEND_CONFIG)
 								Stop_timer_16();
-								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG || Buffer[2] == ASK_DATA){
+								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG || Buffer[2] == ASK_DATA|| Buffer[2] == TAKE_RF){
 									telecommand_rx = false;
 									process_telecommand(Buffer[2], Buffer[3]);
 								}
@@ -412,19 +413,7 @@ void StateMachine( void )
             		//Radio.Rx( RX_TIMEOUT_VALUE );
             		//PacketReceived = false;
             	}
-            	else if(ask_data){
-
-            		Buffer[0] = MISSION_ID;	//Satellite ID
-					Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
-					Buffer[2] =  SEND_DATA; //ID del telecommand de send_data
-
-					Radio.Send( Buffer, BUFFER_SIZE );
-					DelayMs( (uint16_t) time_packets*3/5 );
-					Radio.Send( Buffer, BUFFER_SIZE );
-					ask_data = false;
-					State = RX;
-
-            	}else if (tx_flag){	//Send data
+            	else if (tx_flag){	//Send data
                     //txfunction( );
             		uint64_t read_photo[12];
             		uint8_t transformed[96];
@@ -472,8 +461,8 @@ void StateMachine( void )
             	else if (beacon_flag){
 					uint8_t packet_to_send[] = {MISSION_ID,POCKETQUBE_ID,BEACON};
 					Radio.Send(packet_to_send,sizeof(packet_to_send));
-					DelayMs(100);
-					Radio.Send(packet_to_send,sizeof(packet_to_send));
+					//DelayMs(100);
+					//Radio.Send(packet_to_send,sizeof(packet_to_send));
 					beacon_flag = false;
             	}
 
@@ -876,31 +865,31 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	case NOMINAL:{
 		info_write = info;
 		Flash_Write_Data(NOMINAL_ADDR, &info_write, 1);
-		//xTaskNotify("Task OBC", NOMINAL_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(NOMINAL_NOTI); //Notification to OBC
 		break;
 	}
 	case LOW:{
 		info_write = info;
 		Flash_Write_Data(LOW_ADDR, &info_write, 1);
-		//xTaskNotify("Task OBC", LOW_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(LOW_NOTI); //Notification to OBC
 		break;
 	}
 	case CRITICAL:{
 		info_write = info;
 		Flash_Write_Data(CRITICAL_ADDR, &info_write, 1);
-		//xTaskNotify("Task OBC", CRITICAL_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(CRITICAL_NOTI); //Notification to OBC
 		break;
 	}
 	case EXIT_LOW_POWER:{
-		//xTaskNotify("Task OBC", EXIT_LOW_POWER_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(EXIT_LOW_POWER_NOTI); //Notification to OBC
 		break;
 	}
 	case EXIT_CONTINGENCY:{
-		//xTaskNotify("Task OBC", EXIT_CONTINGENCY_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(EXIT_CONTINGENCY_NOTI); //Notification to OBC
 		break;
 	}
 	case EXIT_SUNSAFE:{
-		//xTaskNotify("Task OBC", EXIT_SUNSAFE_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(EXIT_SUNSAFE_NOTI); //Notification to OBC
 		break;
 	}
 	case SET_TIME:{
@@ -909,13 +898,13 @@ void process_telecommand(uint8_t header, uint8_t info) {
 			time[k]=Buffer[k+3];
 		}
 		Flash_Write_Data(TIME_ADDR, &time, sizeof(time));
-		//xTaskNotify("Task OBC", SETTIME_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(SETTIME_NOTI); //Notification to OBC
 		break;
 	}
 	case SET_CONSTANT_KP:{
 		info_write = info;
 		Flash_Write_Data(KP_ADDR, &info_write, 1);
-		//xTaskNotify("Task OBC", CTEKP_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(CTEKP_NOTI); //Notification to OBC
 		break;
 	}
 	case TLE:{
@@ -930,14 +919,14 @@ void process_telecommand(uint8_t header, uint8_t info) {
 			Flash_Write_Data(TLE_ADDR2, &tle, sizeof(tle));
 			//tle_packets = 0;
 		}
-		//xTaskNotify("Task OBC", TLE_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(TLE_NOTI); //Notification to OBC
 		break;
 		//For high SF 3 packets will be needed and the code should be adjusted
 	}
 	case SET_GYRO_RES:{
 		info_write = info;
 		Flash_Write_Data(GYRO_RES_ADDR, &info_write, 1);
-		//xTaskNotify("Task OBC", GYRORES_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(GYRORES_NOTI); //Notification to OBC
 		break;
 	}
 	case SEND_DATA:{
@@ -1014,7 +1003,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 			calibration_packet[k]=Buffer[k+3];
 		}
 		Flash_Write_Data(CALIBRATION_ADDR, &calibration_packet, sizeof(calibration_packet));
-		//xTaskNotify("Task OBC", CALIBRATION_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(CALIBRATION_NOTI); //Notification to OBC
 		break;
 		//For high SF 2 packets will be needed and the code should be adjusted
 	}
@@ -1029,11 +1018,15 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		Flash_Write_Data(PHOTO_RESOL_ADDR, &info_write, 1);
 		info_write = Buffer[8];
 		Flash_Write_Data(PHOTO_COMPRESSION_ADDR, &info_write, 1);
-		//xTaskNotify("Task OBC", TAKEPHOTO_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(TAKEPHOTO_NOTI); //Notification to OBC
 		break;
 	}
 	case TAKE_RF:{
-		Flash_Write_Data(PL_TIME_ADDR, &Buffer[3], 8);
+		info_write = Buffer[3];
+		for (uint8_t i=1; i<8; i++){
+			info_write = info_write + Buffer[i+3];
+		}
+		Flash_Write_Data(PL_RF_TIME_ADDR, &info_write, 8);
 		info_write = Buffer[11];
 		Flash_Write_Data(F_MIN_ADDR, &info_write, 1);
 		info_write = Buffer[12];
@@ -1042,14 +1035,14 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		Flash_Write_Data(DELTA_F_ADDR, &info_write, 1);
 		info_write = Buffer[14];
 		Flash_Write_Data(INTEGRATION_TIME_ADDR, &info_write, 1);
-		//xTaskNotify("Task OBC", TAKERF_NOTI, eSetBits); //Notification to OBC
+		xTaskNotify(TAKERF_NOTI); //Notification to OBC
 		break;
 	}
 	case SEND_CONFIG:{
 		uint64_t read_config[4];
 		uint8_t transformed[CONFIG_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
 		if (!contingency){
-			Flash_Read_Data(CONFIG_PACKET_SIZE, &read_config, sizeof(read_config));
+			Flash_Read_Data(CONFIG_ADDR, &read_config, sizeof(read_config));
 			Buffer[0] = MISSION_ID;	//Satellite ID
 			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
 			Buffer[2] = num_config;	//Number of the packet
@@ -1059,7 +1052,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 			}
 			Buffer[CONFIG_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator
 			num_config++;
-            DelayMs( 300 );
+            DelayMs(300);
             Radio.Send( Buffer, CONFIG_PACKET_SIZE+4 );
 			State = RX;
 		}
@@ -1068,6 +1061,18 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	default:{
 		State = TX;
 		error_telecommand = true;
+		break;
 	}
 	}
+}
+
+void xTaskNotify(uint8_t noti){
+	uint64_t read_config[1];
+	uint8_t transformed[1];
+	Flash_Read_Data(CONFIG_ADDR, &read_config, sizeof(read_config));
+	memcpy(&transformed, read_config, sizeof(transformed));
+	uint8_t flags = transformed[0] | noti;
+	uint8_t flags64[] = {flags};
+	Flash_Write_Data(CONFIG_ADDR, &flags64,sizeof(flags64));
+
 }

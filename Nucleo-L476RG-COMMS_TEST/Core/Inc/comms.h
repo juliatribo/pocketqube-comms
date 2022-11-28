@@ -32,7 +32,7 @@
 													  //  1: 250 kHz,
 													  //  2: 500 kHz,
 													  //  3: Reserved]
-#define LORA_SPREADING_FACTOR               7         // [SF7..SF12]
+#define LORA_SPREADING_FACTOR               11         // [SF7..SF12]
 #define LORA_CODINGRATE                     1         // [1: 4/5,
 													  //  2: 4/6,
 													  //  3: 4/7,
@@ -167,6 +167,8 @@ bool pin_correct(uint8_t pin_1, uint8_t pin_2);
 void tx_beacon(void);
 
 void comms_timmer(void);
+
+void xTaskNotify(uint8_t noti);
 
 #endif /* INC_COMMS_H_ */
 

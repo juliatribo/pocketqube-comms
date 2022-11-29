@@ -484,7 +484,7 @@ void StateMachine( void )
 					            			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
 					           				Buffer[2] = num_telemetry;	//Number of the packet
 					        				memcpy(&transformed, read_telemetry, sizeof(transformed));
-					            			for (uint8_t i=3; i<TELEMETRY_PACKET_SIZE; i++){
+					            			for (uint8_t i=3; i<TELEMETRY_PACKET_SIZE+3; i++){
 					            				Buffer[i] = transformed[i-3];
 					            			}
 					            			Buffer[TELEMETRY_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator
@@ -978,7 +978,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
 			Buffer[2] = num_telemetry;	//Number of the packet
 			memcpy(&transformed, read_telemetry, sizeof(transformed));
-			for (uint8_t i=3; i<TELEMETRY_PACKET_SIZE; i++){
+			for (uint8_t i=3; i<TELEMETRY_PACKET_SIZE+3; i++){
 				Buffer[i] = transformed[i-3];
 			}
 			Buffer[TELEMETRY_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator
@@ -1068,14 +1068,14 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	}
 	case SEND_CONFIG:{
 		uint64_t read_config[4];
-		uint8_t transformed[CONFIG_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
+		uint8_t transformed[CONFIG_PACKET_SIZE];	//CONFIG_PACKET_SIZE=30
 		if (!contingency){
 			Flash_Read_Data(CONFIG_ADDR, &read_config, sizeof(read_config));
 			Buffer[0] = MISSION_ID;	//Satellite ID
 			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
 			Buffer[2] = num_config;	//Number of the packet
 			memcpy(&transformed, read_config, sizeof(transformed));
-			for (uint8_t i=3; i<CONFIG_PACKET_SIZE; i++){
+			for (uint8_t i=3; i<CONFIG_PACKET_SIZE+3; i++){
 				Buffer[i] = transformed[i-3];
 			}
 			Buffer[CONFIG_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator

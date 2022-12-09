@@ -13,6 +13,8 @@
  ****************************/
 
 // TELECOMMANDS
+#define FLAGS				0b000000
+
 #define RESET_NOTI			0b000001
 
 #define NOMINAL_NOTI 		0b000010

@@ -865,31 +865,31 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	case NOMINAL:{
 		info_write = info;
 		Flash_Write_Data(NOMINAL_ADDR, &info_write, 1);
-		xTaskNotify(NOMINAL_NOTI); //Notification to OBC
+		//xTaskNotify("Task OBC", NOMINAL_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
 	case LOW:{
 		info_write = info;
 		Flash_Write_Data(LOW_ADDR, &info_write, 1);
-		xTaskNotify(LOW_NOTI); //Notification to OBC
+		//xTaskNotify("Task OBC", LOW_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
 	case CRITICAL:{
 		info_write = info;
 		Flash_Write_Data(CRITICAL_ADDR, &info_write, 1);
-		xTaskNotify(CRITICAL_NOTI); //Notification to OBC
+		//xTaskNotify("Task OBC", CRITICAL_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
 	case EXIT_LOW_POWER:{
-		xTaskNotify(EXIT_LOW_POWER_NOTI); //Notification to OBC
+		//xTaskNotify("Task OBC", EXIT_LOW_POWER_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
 	case EXIT_CONTINGENCY:{
-		xTaskNotify(EXIT_CONTINGENCY_NOTI); //Notification to OBC
+		//xTaskNotify("Task OBC", EXIT_CONTINGENCY_NOTI, eSetBits); //Notification to OBC
 		break;
 	}
 	case EXIT_SUNSAFE:{
-		xTaskNotify(EXIT_SUNSAFE_NOTI); //Notification to OBC
+		//xTaskNotify(EXIT_SUNSAFE_NOTI); //Notification to OBC
 		break;
 	}
 	case SET_TIME:{
@@ -1074,5 +1074,6 @@ void xTaskNotify(uint8_t noti){
 	uint8_t flags = transformed[0] | noti;
 	uint8_t flags64[] = {flags};
 	Flash_Write_Data(CONFIG_ADDR, &flags64,sizeof(flags64));
+
 
 }

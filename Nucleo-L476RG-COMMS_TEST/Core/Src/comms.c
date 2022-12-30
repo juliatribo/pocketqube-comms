@@ -311,7 +311,8 @@ void StateMachine( void )
 							if (Buffer[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND. USE VARIABLE compare_arrays
 								//Buffer[2] == (SEND_DATA || SEND_TELEMETRY || ACK_DATA || SEND_CALIBRATION || SEND_CONFIG)
 								Stop_timer_16();
-								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG || Buffer[2] == ASK_DATA){
+								if (Buffer[2] == STOP_SENDING_DATA || Buffer[2] == CHANGE_TIMEOUT || Buffer[2] == SEND_DATA ||
+										Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG || Buffer[2] == ASK_DATA){
 									telecommand_rx = false;
 									process_telecommand(Buffer[2], Buffer[3]);
 								}
@@ -1003,14 +1004,31 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		break;
 	}
 	case ACK_DATA:{
-		if (!contingency && info != 0){
+		//if (!contingency && info != 0){
+		//	nack_flag = true;
+		//	memcpy(&nack, Buffer[3], sizeof(nack));
+		//	tx_flag = true;	//Activates TX flag
+		//	State = TX;
+		//	send_data = true;
+		//}
+		//break;
+
+		if (!contingency && info!=0) {
 			nack_flag = true;
-			memcpy(&nack, Buffer[3], sizeof(nack));
-			tx_flag = true;	//Activates TX flag
+			tx_flag = true;
 			State = TX;
 			send_data = true;
 		}
+
+		uint8_t ack_data_packet[20];
+				for(k=0; k<20; k++) {
+					ack_data_packet[k] = Buffer[k+3];
+				}
+				Flash_Write_Data(ACK_DATA_ADDR, &ack_data_packet, sizeof(ack_data_packet));
+
+
 		break;
+
 	}
 	case SET_SF_CR: {
 		if (info == 0) SF = 7;
@@ -1040,30 +1058,52 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		//For high SF 2 packets will be needed and the code should be adjusted
 	}
 	case CHANGE_TIMEOUT:{
-		memcpy(&time_packets, Buffer[3], 2);
-		Flash_Write_Data(COMMS_TIME_ADDR, &time_packets, sizeof(time_packets));
-		break;
+		//memcpy(&time_packets, Buffer[3], 2);
+		//Flash_Write_Data(COMMS_TIME_ADDR, &time_packets, sizeof(time_packets));
+		//break;
+
+		uint8_t change_timeout_packet[2];
+		for(k=0; k<2; k++) {
+			change_timeout_packet[k] = Buffer[k+3];
+		}
+		Flash_Write_Data(COMMS_TIME_ADDR, &change_timeout_packet, sizeof(change_timeout_packet));
 	}
 	case TAKE_PHOTO:{
-		Flash_Write_Data(PL_TIME_ADDR, &Buffer[3], 4);
-		info_write = Buffer[7];
-		Flash_Write_Data(PHOTO_RESOL_ADDR, &info_write, 1);
-		info_write = Buffer[8];
-		Flash_Write_Data(PHOTO_COMPRESSION_ADDR, &info_write, 1);
+		//Flash_Write_Data(PL_TIME_ADDR, &Buffer[3], 4);
+		//info_write = Buffer[7];
+		//Flash_Write_Data(PHOTO_RESOL_ADDR, &info_write, 1);
+		//info_write = Buffer[8];
+		//Flash_Write_Data(PHOTO_COMPRESSION_ADDR, &info_write, 1);
 		//xTaskNotify("Task OBC", TAKEPHOTO_NOTI, eSetBits); //Notification to OBC
+
+		uint8_t take_photo_packet[6];
+
+		for (k=0; k<9; k++) {
+			take_photo_packet[k] = Buffer [k+3];
+		}
+		Flash_Write_Data(PL_TIME_ADDR, &take_photo_packet, sizeof(take_photo_packet));
+
 		break;
 	}
 	case TAKE_RF:{
-		Flash_Write_Data(PL_TIME_ADDR, &Buffer[3], 8);
-		info_write = Buffer[11];
-		Flash_Write_Data(F_MIN_ADDR, &info_write, 1);
-		info_write = Buffer[12];
-		Flash_Write_Data(F_MAX_ADDR, &info_write, 1);
-		info_write = Buffer[13];
-		Flash_Write_Data(DELTA_F_ADDR, &info_write, 1);
-		info_write = Buffer[14];
-		Flash_Write_Data(INTEGRATION_TIME_ADDR, &info_write, 1);
+		//Flash_Write_Data(PL_TIME_ADDR, &Buffer[3], 8);
+		//info_write = Buffer[11];
+		//Flash_Write_Data(F_MIN_ADDR, &info_write, 1);
+		//info_write = Buffer[12];
+		//Flash_Write_Data(F_MAX_ADDR, &info_write, 1);
+		//info_write = Buffer[13];
+		//Flash_Write_Data(DELTA_F_ADDR, &info_write, 1);
+		//info_write = Buffer[14];
+		//Flash_Write_Data(INTEGRATION_TIME_ADDR, &info_write, 1);
 		//xTaskNotify("Task OBC", TAKERF_NOTI, eSetBits); //Notification to OBC
+
+		uint8_t take_rf_packet[12];
+
+				for (k=0; k<12; k++) {
+					take_rf_packet[k] = Buffer [k+3];
+				}
+				Flash_Write_Data(DELTA_F_ADDR, &take_rf_packet, sizeof(take_rf_packet)); //Aixo sha de canviar, de moment ho emmagatzemo tot en DELTA_F_ADDR
+
 		break;
 	}
 	case SEND_CONFIG:{

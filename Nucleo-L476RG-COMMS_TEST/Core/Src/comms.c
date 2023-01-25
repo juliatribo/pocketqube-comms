@@ -19,6 +19,11 @@
 
 #include "comms.h"
 #include "utils.h"
+#include "ecc.h"
+#include "correct/convolutional/convolutional.h"
+#include "correct/reed-solomon/reed-solomon.h"
+#include <stdio.h>
+#include <assert.h>
 
 /************  STATES  *************/
 
@@ -75,7 +80,7 @@ uint8_t num_config = 0;             //Configuration packet number
 uint8_t num_telemetry = 0;          //Telemetry packet number
 uint8_t window_packet = 0;          //TX window number
 uint8_t nack_counter;               //Position of the NACK array (packets already retransmitted)
-uint8_t k=0;                        //Counter for loops
+uint8_t count=0;                        //Counter for loops
 uint8_t protocol_timeout_counter = 0; //Number of times that the protocol timer (500 ms) has ended
                                       //This is used to have longer timers for higher SF
 
@@ -100,7 +105,7 @@ uint16_t RxTimeoutCnt = 0;
 uint16_t SymbTimeoutCnt = 0;
 int16_t RssiMoy = 0;
 int8_t SnrMoy = 0;
-
+unsigned char codeword_interleaved[ML];
 
 
 // VARIABLES FROM OLD CODE
@@ -894,8 +899,8 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	}
 	case SET_TIME:{
 		uint8_t time[4];
-		for (k=0; k<4; k++){
-			time[k]=Buffer[k+3];
+		for (count=0; count<4; count++){
+			time[count]=Buffer[count+3];
 		}
 		Flash_Write_Data(TIME_ADDR, &time, sizeof(time));
 		xTaskNotify(SETTIME_NOTI); //Notification to OBC
@@ -909,8 +914,8 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	}
 	case TLE:{
 		uint8_t tle[TLE_PACKET_SIZE];
-		for (k=0; k<TLE_PACKET_SIZE; k++){
-			tle[k]=Buffer[k+3];
+		for (count=0; count<TLE_PACKET_SIZE; count++){
+			tle[count]=Buffer[count+3];
 		}
 		if (tle_telecommand){
 			Flash_Write_Data(TLE_ADDR1, &tle, sizeof(tle));
@@ -949,11 +954,166 @@ void process_telecommand(uint8_t header, uint8_t info) {
 			for (uint8_t i=3; i<TELEMETRY_PACKET_SIZE; i++){
 				Buffer[i] = transformed[i-3];
 			}
-			Buffer[TELEMETRY_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator
+			Buffer[TELEMETRY_PACKET_SIZE+2] = 0xFF;	//Final of the packet indicator
 			num_telemetry++;
             DelayMs( 300 );
-            Radio.Send( Buffer, TELEMETRY_PACKET_SIZE+4 );
+
+
+            /////////////////////////////////////////////////////////////////////////
+//            //ENCODED REED SOLOMON LIBCORRECT
+//            print_word(TELEMETRY_PACKET_SIZE+4, Buffer);
+//
+//            static const uint16_t correct_rs_primitive_polynomial_ccsds = 0x187;  // x^8 + x^7 + x^2 + x + 1
+//            size_t block_length = 255;
+//            size_t min_distance = 32;
+//            size_t message_length = block_length-min_distance;
+//
+//            correct_reed_solomon *rs = correct_reed_solomon_create(correct_rs_primitive_polynomial_ccsds, 1, 1, min_distance);
+//
+//            uint8_t rs_encoded[message_length];
+//            ssize_t size_encode = correct_reed_solomon_encode(rs, Buffer, message_length,rs_encoded);
+//            print_word(size_encode, rs_encoded);
+//
+//			// add two random errors to codeword
+//			unsigned char r = rand() % 256;
+//			int rloc = rand() % (TELEMETRY_PACKET_SIZE+4);
+//			rs_encoded[rloc] = r;
+//
+//			unsigned char r2 = rand() % 256;
+//			int rloc2 = rand() % (TELEMETRY_PACKET_SIZE+4);
+//			rs_encoded[rloc2] = r2;
+//			print_word(size_encode, rs_encoded);
+//
+//            uint8_t rs_decoded[message_length];
+//            ssize_t size_decode = correct_reed_solomon_decode(rs, rs_encoded, size_encode,rs_decoded);
+//            print_word(size_decode, rs_decoded);
+
+            //ENCODE REED SOLOMON
+            unsigned char codeword[256];
+            int erasures[16];
+            int nerasures = 0;
+
+            /* Initialization the ECC library */
+            initialize_ecc ();
+
+            srand(time(NULL));   // Initialization, should only be called once.
+
+			print_word(TELEMETRY_PACKET_SIZE+3, Buffer);
+			encode_data(Buffer, TELEMETRY_PACKET_SIZE+3, codeword);
+			//printf("encoded data:\n");
+			print_word(ML, codeword);
+
+			// add two random errors to codeword
+//			unsigned char r = rand() % 256;
+//			int rloc = rand() % (TELEMETRY_PACKET_SIZE+4);
+//			codeword[rloc] = r;
+//
+//			unsigned char r2 = rand() % 256;
+//			int rloc2 = rand() % (TELEMETRY_PACKET_SIZE+4);
+//			codeword[rloc2] = r2;
+
+			//print_word(ML, codeword);
+			//add padding to do the interleaver
+
+			int BLOCK_ROWS = 4;
+			int BLOCK_COL = 4;
+			int size = ML;
+			codeword[ML] = 0xFF;
+			for(int i = 1; (ML + i) % (BLOCK_ROWS*BLOCK_COL) != 0; i++){
+				codeword[ML + i] = 0;
+				size++;
+			}
+			print_word(size, codeword);
+
+			//INTERLEAVE
+			interleave(codeword,BLOCK_ROWS,BLOCK_COL, size);
+			print_word(size, codeword_interleaved);
+
+			//ENCODE CONVOLUTIONAL
+			size_t rate = 2;
+			size_t order = 7;
+
+			uint8_t msg[size];
+			memcpy(msg, codeword_interleaved, size);
+			//print_word(ML, msg);
+
+			correct_convolutional *conv;
+
+
+
+			//create convolutional config
+		    conv = correct_convolutional_create(rate, order, correct_conv_r12_7_polynomial);
+
+		    //get size of encoded message in bytes
+		    size_t len_to_encode = correct_convolutional_encode_len(conv, size);
+		    int len_to_encode_bytes = ceil(len_to_encode/8);
+		    uint8_t conv_encoded[len_to_encode_bytes];
+
+		    //encode message
+		    size_t encoded_len_bits = correct_convolutional_encode(conv,msg,size,conv_encoded);
+		    int encoded_len_bytes = ceil(encoded_len_bits/8);
+			print_word(encoded_len_bytes, conv_encoded);
+
+			//add random errors
+			uint8_t r3 = rand() % 256;
+			int rloc3 = rand() % (encoded_len_bytes);
+			conv_encoded[rloc3] = r3;
+
+			uint8_t r4 = rand() % 256;
+			int rloc4 = rand() % (encoded_len_bits/8);
+			conv_encoded[rloc4] = r4;
+			print_word(encoded_len_bytes, conv_encoded);
+
+//			/* Now decode -- encoded codeword size must be passed */
+//
+//			//DECODE CONVOLUTIONAL
+//			uint8_t conv_decoded[size];
+//			ssize_t decoded_conv_size = correct_convolutional_decode(conv, conv_encoded, encoded_len_bits, conv_decoded);
+//			//print_word(decoded_conv_size,conv_decoded);
+//
+//			//DEINTERLEAVE
+//			deinterleave(codeword_interleaved,BLOCK_ROWS,BLOCK_COL, size);
+//			//print_word( size, codeword_interleaved);
+//
+//			//DECODE REED SOLOMON
+//			decode_data(codeword_interleaved, ML);
+//
+//			int syndrome = check_syndrome();
+//			/* check if syndrome is all zeros */
+//			if (syndrome == 0) {
+//				// no errs detected, codeword payload should match message
+//				//print_word(ML, codeword_interleaved);
+//			} else {
+//				//nonzero syndrome, attempting correcting errors
+//				int result = 0;//result 0 not able to correct, result 1 corrected
+//				result =correct_errors_erasures (codeword_interleaved,
+//												ML,
+//												nerasures,
+//												erasures);
+//				//print_word(ML, codeword_interleaved);
+//			}
+
+
+
+
+			//memcpy(&msg, codeword_interleaved, sizeof(msg));
+			//const uint8_t *msg = (uint8_t)atoi(codeword_interleaved);
+
+
+			//CONVOLUTIONAL CODE
+			///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+			//decode message
+
+
+			///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+            Radio.Send(conv_encoded,encoded_len_bytes);
+            Delay(300);
+            Radio.Send(conv_encoded,encoded_len_bytes);
 			State = RX;
+
 		}
 		break;
 	}
@@ -999,8 +1159,8 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	case SEND_CALIBRATION:{
 		/* CALIBRATION PACKET RECEIVED */
 		uint8_t calibration_packet[CALIBRATION_PACKET_SIZE];
-		for (k=0; k<CALIBRATION_PACKET_SIZE; k++){
-			calibration_packet[k]=Buffer[k+3];
+		for (count=0; count<CALIBRATION_PACKET_SIZE; count++){
+			calibration_packet[count]=Buffer[count+3];
 		}
 		Flash_Write_Data(CALIBRATION_ADDR, &calibration_packet, sizeof(calibration_packet));
 		xTaskNotify(CALIBRATION_NOTI); //Notification to OBC
@@ -1069,11 +1229,78 @@ void process_telecommand(uint8_t header, uint8_t info) {
 void xTaskNotify(uint8_t noti){
 	uint64_t read_config[1];
 	uint8_t transformed[1];
-	Flash_Read_Data(CONFIG_ADDR, &read_config, sizeof(read_config));
+	Flash_Read_Data(CONFIG_ADDR, &read_config, sizeof(read_config));   //canviar config adress
 	memcpy(&transformed, read_config, sizeof(transformed));
 	uint8_t flags = transformed[0] | noti;
 	uint8_t flags64[] = {flags};
 	Flash_Write_Data(CONFIG_ADDR, &flags64,sizeof(flags64));
 
 
+}
+
+
+
+
+/* Some debugging routines to introduce errors or erasures
+   into a codeword.
+   */
+
+/* Introduce a byte error at LOC */
+void byte_err (int err, int loc, unsigned char *dst)
+{
+  printf("Adding Error at loc %d, data %#x\n", loc, dst[loc-1]);
+  dst[loc-1] ^= err;
+}
+
+/* Pass in location of error (first byte position is
+   labeled starting at 1, not 0), and the codeword.
+*/
+void byte_erasure (int loc, unsigned char dst[], int cwsize, int erasures[])
+{
+  printf("Erasure at loc %d, data %#x\n", loc, dst[loc-1]);
+  dst[loc-1] = 0;
+}
+
+void print_word(int p, unsigned char *data) {
+  int i;
+  for (i=0; i < p; i++) {
+    printf ("%02X ", data[i]);
+  }
+  printf("\n");
+}
+
+void interleave(unsigned char *codeword, int block_row_num,int block_col_num, int size){
+
+	bool end = false;
+	int q = 0;
+	int r = 0;
+	int col;
+	int row;
+	char block[block_row_num][block_col_num];
+
+	while(q < size){
+		col = 0;
+		for(col; col < block_col_num && !end; col++){
+			row = 0;
+			for(row; row < block_row_num && !end; row++){
+				if (q < size){
+					block[row][col] = codeword[q];
+					q++;
+				}
+				else{
+					end = true;
+				}
+			}
+		}
+		for(int t = 0; t < block_col_num; t++){
+			for(int p = 0; p < block_row_num; p++){
+					codeword_interleaved[r] = block[t][p];
+					r++;
+			}
+		}
+	}
+}
+
+void deinterleave(unsigned char *codeword_interleaved, int block_row_num,int block_col_num , int size){
+	interleave(codeword_interleaved, block_row_num,block_col_num , size);
 }

@@ -79,7 +79,8 @@ TimerEvent_t RxAppTimeoutTimer;
 #define ACK_PAYLOAD_LENGTH		5			//ACK payload data length
 #define CONFIG_SIZE		13
 
-
+//OTHER
+#define ML (TELEMETRY_PACKET_SIZE + 3 + NPAR)
 
 /*!
  * Radio events function pointer
@@ -169,6 +170,10 @@ void tx_beacon(void);
 void comms_timmer(void);
 
 void xTaskNotify(uint8_t noti);
+
+void interleave(unsigned char *codeword, int block_row_num,int block_col_num, int size);
+
+void deinterleave(unsigned char *codeword_interleaved, int block_row_num,int block_col_num, int size);
 
 #endif /* INC_COMMS_H_ */
 

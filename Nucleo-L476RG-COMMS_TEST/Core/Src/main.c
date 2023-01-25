@@ -506,9 +506,9 @@ int main(void)
 	  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 //	  eighttosixfour();
 	  //Flash_Read_Data(TEST_ADDRESS,&Memory1,250);
-	  Flash_Write_Data(SAVE_PHOTO,&photo_vect,128);
-	  Flash_Write_Data(CONFIG_ADDR,&config_vect,sizeof(config_vect));
-	  Flash_Write_Data(CONFIG_ADDR,&flag,1);
+//	  Flash_Write_Data(SAVE_PHOTO,&photo_vect,128);
+//	  Flash_Write_Data(CONFIG_ADDR,&config_vect,sizeof(config_vect));
+//	  Flash_Write_Data(CONFIG_ADDR,&flag,1);
 	  HAL_Delay(1000);
 	  StateMachine();	//COMMS FUNCTION
     /* USER CODE END WHILE */

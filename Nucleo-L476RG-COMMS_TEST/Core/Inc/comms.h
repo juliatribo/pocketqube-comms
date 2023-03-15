@@ -77,19 +77,10 @@ TimerEvent_t RxAppTimeoutTimer;
 
 #define UPLINK_BUFFER_SIZE		100
 #define ACK_PAYLOAD_LENGTH		5			//ACK payload data length
-#define CONFIG_SIZE				13
+#define CONFIG_SIZE		13
 
 //OTHER
-#define ML 							(TELEMETRY_PACKET_SIZE + 3 + NPAR)
-#define BLOCK_LENGTH_RS 			255
-#define MIN_DISTANCE_RS 			32
-#define MESSAGE_LENGTH_RS 			223
-
-#define RATE_CON  					2
-#define ORDER_CON 					7
-
-#define BLOCK_ROW_INTER 			4
-#define BLOCK_COL_INTER 			4
+#define ML (TELEMETRY_PACKET_SIZE + 3 + NPAR)
 
 /*!
  * Radio events function pointer
@@ -180,13 +171,9 @@ void comms_timmer(void);
 
 void xTaskNotify(uint8_t noti);
 
-void interleave(unsigned char *codeword, int size);
+void interleave(unsigned char *codeword, int block_row_num,int block_col_num, int size);
 
-void deinterleave(unsigned char *codeword_interleaved, int size);
-
-int encode (uint8_t* Buffer, uint8_t* conv_encoded);
-
-void decode(uint8_t* data, size_t length);
+void deinterleave(unsigned char *codeword_interleaved, int block_row_num,int block_col_num, int size);
 
 #endif /* INC_COMMS_H_ */
 

@@ -50,6 +50,8 @@ States_t State = LOWPOWER;          //Current state of the State Machine
 /************  PACKETS  ************/
 
 uint8_t Buffer[BUFFER_SIZE];        //Tx and Rx Buffer
+uint16_t BufferSize;				//Buffer size
+uint8_t decoded[BUFFER_SIZE];			//decodeded mes
 uint8_t nack[WINDOW_SIZE];          //To store the last ack/nack received
 uint8_t last_telecommand[BUFFER_SIZE]; //Last telecommand RX
 
@@ -105,8 +107,6 @@ uint16_t RxTimeoutCnt = 0;
 uint16_t SymbTimeoutCnt = 0;
 int16_t RssiMoy = 0;
 int8_t SnrMoy = 0;
-unsigned char codeword_interleaved[ML];
-
 
 // VARIABLES FROM OLD CODE
 /*uint8_t calib_packets = 0;        //Counter of the calibration packets received
@@ -281,6 +281,49 @@ void StateMachine( void )
             {
                 if( PacketReceived == true )
                 {
+                	correct_convolutional *conv;
+                	print_word( BufferSize, Buffer);
+
+                	//create convolutional config
+                	conv = correct_convolutional_create(RATE_CON, ORDER_CON, correct_conv_r12_7_polynomial);
+
+                	int index = ceil(BufferSize/RATE_CON);
+					uint8_t conv_decoded[index];
+					ssize_t decoded_conv_size = correct_convolutional_decode(conv, Buffer, BufferSize*8, conv_decoded);
+					//print_word(decoded_conv_size,conv_decoded);
+
+					//DEINTERLEAVE
+					unsigned char codeword_deinterleaved[127]; //127 is the maximum value it can get taking into account the tinygs maximum length is 255 and that the convolutional code adds redundant bytes
+					index = deinterleave(conv_decoded, decoded_conv_size, codeword_deinterleaved);
+					//print_word(index,codeword_interleaved);
+
+
+					//print_word( index, codeword_interleaved);
+
+					//DECODE REED SOLOMON
+
+		            int erasures[16];
+		            int nerasures = 0;
+					decode_data(codeword_deinterleaved, index-4);
+
+					int syndrome = check_syndrome();
+					/* check if syndrome is all zeros */
+					if (syndrome == 0) {
+						// no errs detected, codeword payload should match message
+						//print_word(index, codeword_interleaved);
+					} else {
+						//nonzero syndrome, attempting correcting errors
+						int result = 0;//result 0 not able to correct, result 1 corrected
+						result =correct_errors_erasures (codeword_deinterleaved,
+														index,
+														nerasures,
+														erasures);
+						//print_word(index, codeword_interleaved);
+					}
+
+					print_word(index-4, codeword_deinterleaved);
+					memcpy(decoded, codeword_deinterleaved,index-4);
+
 					//test_counter = test_counter + 1;
 					/*for (uint8_t i=0; i<BUFFER_SIZE; i++){
 						MemoryRX[i + rxCounter*BUFFER_SIZE] = Buffer[i];
@@ -295,10 +338,10 @@ void StateMachine( void )
 						tx_non_stop = 1;
 						DelayMs(1000);
 					}*/
-					if (pin_correct(Buffer[0], Buffer[1]))
+					if (pin_correct(decoded[0], decoded[1]))
 					{
 						State = LOWPOWER;
-						if (Buffer[2] == TLE){
+						if (decoded[2] == TLE){
 							Stop_timer_16();	//This is not necessary, put here for safety
 							if (!tle_telecommand){	//First TLE packet
 								tle_telecommand = true;
@@ -310,16 +353,16 @@ void StateMachine( void )
 								State = LOWPOWER;	//Line unnecessary
 								telecommand_rx = false;
 							}
-							process_telecommand(Buffer[2], Buffer[3]);	//Saves the TLE
+							process_telecommand(decoded[2], decoded[3]);	//Saves the TLE
 						}
 						else if (telecommand_rx){	//Second telecommand RX consecutively
 							//rx_attemps_counter = 0;
-							if (Buffer[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND. USE VARIABLE compare_arrays
+							if (decoded[2] == last_telecommand[2]){	//Second telecommand received equal to the first CHANGE THIS TO CHECK THE WHOLE TELECOMMAND. USE VARIABLE compare_arrays
 								//Buffer[2] == (SEND_DATA || SEND_TELEMETRY || ACK_DATA || SEND_CALIBRATION || SEND_CONFIG)
 								Stop_timer_16();
-								if (Buffer[2] == SEND_DATA || Buffer[2] == SEND_TELEMETRY || Buffer[2] == ACK_DATA || Buffer[2] == SEND_CALIBRATION || Buffer[2] == SEND_CONFIG || Buffer[2] == ASK_DATA|| Buffer[2] == TAKE_RF){
+								if (decoded[2] == SEND_DATA || decoded[2] == SEND_TELEMETRY || decoded[2] == ACK_DATA || decoded[2] == SEND_CALIBRATION || decoded[2] == SEND_CONFIG || decoded[2] == ASK_DATA|| decoded[2] == TAKE_RF){
 									telecommand_rx = false;
-									process_telecommand(Buffer[2], Buffer[3]);
+									process_telecommand(decoded[2], decoded[3]);
 								}
 								else {
 									request_execution = true;
@@ -327,7 +370,7 @@ void StateMachine( void )
 									DelayMs(300);
 								}
 							}
-							else if(Buffer[2] == ACK){	//Order execution ACK
+							else if(decoded[2] == ACK){	//Order execution ACK
 								//rx_attemps_counter = 0;
 								Stop_timer_16();
 								request_counter = 0;
@@ -346,7 +389,7 @@ void StateMachine( void )
 							}
 						}
 						else{	//First telecommand RX
-							memcpy( last_telecommand, Buffer, BUFFER_SIZE );
+							memcpy( last_telecommand, decoded, index-4 );
 							last_telecommand[0] = MISSION_ID;	//To avoid retransmitting the PIN
 							last_telecommand[1] = POCKETQUBE_ID;
 							tle_telecommand = false;
@@ -426,32 +469,32 @@ void StateMachine( void )
             			if (nack_flag){
             				if (nack[nack_counter] != 0){
             					Flash_Read_Data(DATA_ADDR + nack[nack_counter]*96, &read_photo, sizeof(read_photo));
-                    			Buffer[2] = nack[nack_counter];	//Number of the retransmitted packet
+            					decoded[2] = nack[nack_counter];	//Number of the retransmitted packet
                     			nack_counter++;
             				} else{ //When all packets have been retransmitted, we continue with the next one
             					nack_flag = false;
             					nack_counter = 0;
                 				Flash_Read_Data(DATA_ADDR + packet_number*96, &read_photo, sizeof(read_photo));
-                    			Buffer[2] = packet_number;	//Number of the packet
+                				decoded[2] = packet_number;	//Number of the packet
                     			packet_number++;
             				}
             			} else {
             				Flash_Read_Data(DATA_ADDR + packet_number*96, &read_photo, sizeof(read_photo));
-                			Buffer[2] = packet_number;	//Number of the packet
+            				decoded[2] = packet_number;	//Number of the packet
                 			packet_number++;
             			}
-            			Buffer[0] = MISSION_ID;	//Satellite ID
-            			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
+            			decoded[0] = MISSION_ID;	//Satellite ID
+            			decoded[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
             			memcpy(&transformed, read_photo, sizeof(transformed));
             			for (uint8_t i=3; i<BUFFER_SIZE-1; i++){
-            				Buffer[i] = transformed[i-3];
+            				decoded[i] = transformed[i-3];
             			}
-            			Buffer[BUFFER_SIZE-1] = 0xFF;	//Final of the packet indicator
+            			decoded[BUFFER_SIZE-1] = 0xFF;	//Final of the packet indicator
             			window_packet++;
             			State = TX;
                         //DelayMs( 300 );
             			DelayMs( (uint16_t) time_packets*3/5 );
-                        Radio.Send( Buffer, BUFFER_SIZE );
+                        Radio.Send( decoded, BUFFER_SIZE );
             		} else{
             			//tx_non_stop = false;
             			tx_flag = false;
@@ -670,7 +713,8 @@ void OnTxDone( void )
 void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
 {
     Radio.Standby( );
-    uint16_t BufferSize = size;
+    BufferSize = size;
+
     memcpy( Buffer, payload, BufferSize );
     //uint8_t RXactual[BufferSize];
     //memcpy( RXactual, payload, BufferSize );
@@ -900,7 +944,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	case SET_TIME:{
 		uint8_t time[4];
 		for (count=0; count<4; count++){
-			time[count]=Buffer[count+3];
+			time[count]=decoded[count+3];
 		}
 		Flash_Write_Data(TIME_ADDR, &time, sizeof(time));
 		xTaskNotify(SETTIME_NOTI); //Notification to OBC
@@ -915,7 +959,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	case TLE:{
 		uint8_t tle[TLE_PACKET_SIZE];
 		for (count=0; count<TLE_PACKET_SIZE; count++){
-			tle[count]=Buffer[count+3];
+			tle[count]=decoded[count+3];
 		}
 		if (tle_telecommand){
 			Flash_Write_Data(TLE_ADDR1, &tle, sizeof(tle));
@@ -924,7 +968,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 			Flash_Write_Data(TLE_ADDR2, &tle, sizeof(tle));
 			//tle_packets = 0;
 		}
-		xTaskNotify(TLE_NOTI); //Notification to OBC
+		//xTaskNotify(TLE_NOTI); //Notification to OBC
 		break;
 		//For high SF 3 packets will be needed and the code should be adjusted
 	}
@@ -947,167 +991,20 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		uint8_t transformed[TELEMETRY_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
 		if (!contingency){
 			Flash_Read_Data(TELEMETRY_ADDR, &read_telemetry, sizeof(read_telemetry));
-			Buffer[0] = MISSION_ID;	//Satellite ID
-			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
-			Buffer[2] = num_telemetry;	//Number of the packet
+			decoded[0] = MISSION_ID;	//Satellite ID
+			decoded[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
+			decoded[2] = num_telemetry;	//Number of the packet
 			memcpy(&transformed, read_telemetry, sizeof(transformed));
 			for (uint8_t i=3; i<TELEMETRY_PACKET_SIZE; i++){
-				Buffer[i] = transformed[i-3];
+				decoded[i] = transformed[i-3];
 			}
-			Buffer[TELEMETRY_PACKET_SIZE+2] = 0xFF;	//Final of the packet indicator
+			decoded[TELEMETRY_PACKET_SIZE+2] = 0xFF;	//Final of the packet indicator
 			num_telemetry++;
             DelayMs( 300 );
 
-
-            /////////////////////////////////////////////////////////////////////////
-//            //ENCODED REED SOLOMON LIBCORRECT
-//            print_word(TELEMETRY_PACKET_SIZE+4, Buffer);
-//
-//            static const uint16_t correct_rs_primitive_polynomial_ccsds = 0x187;  // x^8 + x^7 + x^2 + x + 1
-//            size_t block_length = 255;
-//            size_t min_distance = 32;
-//            size_t message_length = block_length-min_distance;
-//
-//            correct_reed_solomon *rs = correct_reed_solomon_create(correct_rs_primitive_polynomial_ccsds, 1, 1, min_distance);
-//
-//            uint8_t rs_encoded[message_length];
-//            ssize_t size_encode = correct_reed_solomon_encode(rs, Buffer, message_length,rs_encoded);
-//            print_word(size_encode, rs_encoded);
-//
-//			// add two random errors to codeword
-//			unsigned char r = rand() % 256;
-//			int rloc = rand() % (TELEMETRY_PACKET_SIZE+4);
-//			rs_encoded[rloc] = r;
-//
-//			unsigned char r2 = rand() % 256;
-//			int rloc2 = rand() % (TELEMETRY_PACKET_SIZE+4);
-//			rs_encoded[rloc2] = r2;
-//			print_word(size_encode, rs_encoded);
-//
-//            uint8_t rs_decoded[message_length];
-//            ssize_t size_decode = correct_reed_solomon_decode(rs, rs_encoded, size_encode,rs_decoded);
-//            print_word(size_decode, rs_decoded);
-
-            //ENCODE REED SOLOMON
-            unsigned char codeword[256];
-            int erasures[16];
-            int nerasures = 0;
-
-            /* Initialization the ECC library */
-            initialize_ecc ();
-
-            srand(time(NULL));   // Initialization, should only be called once.
-
-			print_word(TELEMETRY_PACKET_SIZE+3, Buffer);
-			encode_data(Buffer, TELEMETRY_PACKET_SIZE+3, codeword);
-			//printf("encoded data:\n");
-			print_word(ML, codeword);
-
-			// add two random errors to codeword
-//			unsigned char r = rand() % 256;
-//			int rloc = rand() % (TELEMETRY_PACKET_SIZE+4);
-//			codeword[rloc] = r;
-//
-//			unsigned char r2 = rand() % 256;
-//			int rloc2 = rand() % (TELEMETRY_PACKET_SIZE+4);
-//			codeword[rloc2] = r2;
-
-			//print_word(ML, codeword);
-			//add padding to do the interleaver
-
-			int BLOCK_ROWS = 4;
-			int BLOCK_COL = 4;
-			int size = ML;
-			codeword[ML] = 0xFF;
-			for(int i = 1; (ML + i) % (BLOCK_ROWS*BLOCK_COL) != 0; i++){
-				codeword[ML + i] = 0;
-				size++;
-			}
-			print_word(size, codeword);
-
-			//INTERLEAVE
-			interleave(codeword,BLOCK_ROWS,BLOCK_COL, size);
-			print_word(size, codeword_interleaved);
-
-			//ENCODE CONVOLUTIONAL
-			size_t rate = 2;
-			size_t order = 7;
-
-			uint8_t msg[size];
-			memcpy(msg, codeword_interleaved, size);
-			//print_word(ML, msg);
-
-			correct_convolutional *conv;
-
-
-
-			//create convolutional config
-		    conv = correct_convolutional_create(rate, order, correct_conv_r12_7_polynomial);
-
-		    //get size of encoded message in bytes
-		    size_t len_to_encode = correct_convolutional_encode_len(conv, size);
-		    int len_to_encode_bytes = ceil(len_to_encode/8);
-		    uint8_t conv_encoded[len_to_encode_bytes];
-
-		    //encode message
-		    size_t encoded_len_bits = correct_convolutional_encode(conv,msg,size,conv_encoded);
-		    int encoded_len_bytes = ceil(encoded_len_bits/8);
-			print_word(encoded_len_bytes, conv_encoded);
-
-			//add random errors
-			uint8_t r3 = rand() % 256;
-			int rloc3 = rand() % (encoded_len_bytes);
-			conv_encoded[rloc3] = r3;
-
-			uint8_t r4 = rand() % 256;
-			int rloc4 = rand() % (encoded_len_bits/8);
-			conv_encoded[rloc4] = r4;
-			print_word(encoded_len_bytes, conv_encoded);
-
-//			/* Now decode -- encoded codeword size must be passed */
-//
-//			//DECODE CONVOLUTIONAL
-//			uint8_t conv_decoded[size];
-//			ssize_t decoded_conv_size = correct_convolutional_decode(conv, conv_encoded, encoded_len_bits, conv_decoded);
-//			//print_word(decoded_conv_size,conv_decoded);
-//
-//			//DEINTERLEAVE
-//			deinterleave(codeword_interleaved,BLOCK_ROWS,BLOCK_COL, size);
-//			//print_word( size, codeword_interleaved);
-//
-//			//DECODE REED SOLOMON
-//			decode_data(codeword_interleaved, ML);
-//
-//			int syndrome = check_syndrome();
-//			/* check if syndrome is all zeros */
-//			if (syndrome == 0) {
-//				// no errs detected, codeword payload should match message
-//				//print_word(ML, codeword_interleaved);
-//			} else {
-//				//nonzero syndrome, attempting correcting errors
-//				int result = 0;//result 0 not able to correct, result 1 corrected
-//				result =correct_errors_erasures (codeword_interleaved,
-//												ML,
-//												nerasures,
-//												erasures);
-//				//print_word(ML, codeword_interleaved);
-//			}
-
-
-
-
-			//memcpy(&msg, codeword_interleaved, sizeof(msg));
-			//const uint8_t *msg = (uint8_t)atoi(codeword_interleaved);
-
-
-			//CONVOLUTIONAL CODE
-			///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-			//decode message
-
-
-			///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+            uint8_t conv_encoded[256];
+            int encoded_len_bytes = encode (decoded, conv_encoded, TELEMETRY_PACKET_SIZE+3);
+            print_word(encoded_len_bytes, conv_encoded);
 
             Radio.Send(conv_encoded,encoded_len_bytes);
             Delay(300);
@@ -1133,7 +1030,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 	case ACK_DATA:{
 		if (!contingency && info != 0){
 			nack_flag = true;
-			memcpy(&nack, Buffer[3], sizeof(nack));
+			memcpy(&nack, decoded[3], sizeof(nack));
 			tx_flag = true;	//Activates TX flag
 			State = TX;
 			send_data = true;
@@ -1150,7 +1047,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		info_write = SF;
 		Flash_Write_Data(SF_ADDR, &info_write, 1);
 		/*4 cases (4/5, 4/6, 4/7,1/2), so we will receive and store 0, 1, 2 or 3*/
-		info_write = Buffer[4];
+		info_write = decoded[4];
 		Flash_Write_Data(CRC_ADDR, &info_write, 1);
 		DelayMs(10);
 		configuration();
@@ -1160,7 +1057,7 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		/* CALIBRATION PACKET RECEIVED */
 		uint8_t calibration_packet[CALIBRATION_PACKET_SIZE];
 		for (count=0; count<CALIBRATION_PACKET_SIZE; count++){
-			calibration_packet[count]=Buffer[count+3];
+			calibration_packet[count]=decoded[count+3];
 		}
 		Flash_Write_Data(CALIBRATION_ADDR, &calibration_packet, sizeof(calibration_packet));
 		xTaskNotify(CALIBRATION_NOTI); //Notification to OBC
@@ -1168,32 +1065,32 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		//For high SF 2 packets will be needed and the code should be adjusted
 	}
 	case CHANGE_TIMEOUT:{
-		memcpy(&time_packets, Buffer[3], 2);
+		memcpy(&time_packets, decoded[3], 2);
 		Flash_Write_Data(COMMS_TIME_ADDR, &time_packets, sizeof(time_packets));
 		break;
 	}
 	case TAKE_PHOTO:{
-		Flash_Write_Data(PL_TIME_ADDR, &Buffer[3], 4);
-		info_write = Buffer[7];
+		Flash_Write_Data(PL_TIME_ADDR, &decoded[3], 4);
+		info_write = decoded[7];
 		Flash_Write_Data(PHOTO_RESOL_ADDR, &info_write, 1);
-		info_write = Buffer[8];
+		info_write = decoded[8];
 		Flash_Write_Data(PHOTO_COMPRESSION_ADDR, &info_write, 1);
 		xTaskNotify(TAKEPHOTO_NOTI); //Notification to OBC
 		break;
 	}
 	case TAKE_RF:{
-		info_write = Buffer[3];
+		info_write = decoded[3];
 		for (uint8_t i=1; i<8; i++){
-			info_write = info_write + Buffer[i+3];
+			info_write = info_write + decoded[i+3];
 		}
 		Flash_Write_Data(PL_RF_TIME_ADDR, &info_write, 8);
-		info_write = Buffer[11];
+		info_write = decoded[11];
 		Flash_Write_Data(F_MIN_ADDR, &info_write, 1);
-		info_write = Buffer[12];
+		info_write = decoded[12];
 		Flash_Write_Data(F_MAX_ADDR, &info_write, 1);
-		info_write = Buffer[13];
+		info_write = decoded[13];
 		Flash_Write_Data(DELTA_F_ADDR, &info_write, 1);
-		info_write = Buffer[14];
+		info_write = decoded[14];
 		Flash_Write_Data(INTEGRATION_TIME_ADDR, &info_write, 1);
 		xTaskNotify(TAKERF_NOTI); //Notification to OBC
 		break;
@@ -1203,17 +1100,17 @@ void process_telecommand(uint8_t header, uint8_t info) {
 		uint8_t transformed[CONFIG_PACKET_SIZE];	//Maybe is better to use 40 bytes, as multiple of 8
 		if (!contingency){
 			Flash_Read_Data(CONFIG_ADDR, &read_config, sizeof(read_config));
-			Buffer[0] = MISSION_ID;	//Satellite ID
-			Buffer[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
-			Buffer[2] = num_config;	//Number of the packet
+			decoded[0] = MISSION_ID;	//Satellite ID
+			decoded[1] = POCKETQUBE_ID;	//Poquetcube ID (there are at least 3)
+			decoded[2] = num_config;	//Number of the packet
 			memcpy(&transformed, read_config, sizeof(transformed));
 			for (uint8_t i=3; i<CONFIG_PACKET_SIZE; i++){
-				Buffer[i] = transformed[i-3];
+				decoded[i] = transformed[i-3];
 			}
-			Buffer[CONFIG_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator
+			decoded[CONFIG_PACKET_SIZE+3] = 0xFF;	//Final of the packet indicator
 			num_config++;
             DelayMs(300);
-            Radio.Send( Buffer, CONFIG_PACKET_SIZE+4 );
+            Radio.Send( decoded, CONFIG_PACKET_SIZE+4 );
 			State = RX;
 		}
 		break;
@@ -1269,20 +1166,26 @@ void print_word(int p, unsigned char *data) {
   printf("\n");
 }
 
-void interleave(unsigned char *codeword, int block_row_num,int block_col_num, int size){
+int interleave(unsigned char *codeword, int size,unsigned char* codeword_interleaved){
+
+	int initial_length = size;
+	for(int i = 1; (initial_length + i) % (BLOCK_ROW_INTER*BLOCK_COL_INTER) != 0; i++){
+		codeword[initial_length + i] = 0;
+		size++;
+	}
 
 	bool end = false;
 	int q = 0;
 	int r = 0;
 	int col;
 	int row;
-	char block[block_row_num][block_col_num];
+	char block[BLOCK_ROW_INTER][BLOCK_COL_INTER];
 
 	while(q < size){
 		col = 0;
-		for(col; col < block_col_num && !end; col++){
+		for(col; col < BLOCK_COL_INTER && !end; col++){
 			row = 0;
-			for(row; row < block_row_num && !end; row++){
+			for(row; row < BLOCK_ROW_INTER && !end; row++){
 				if (q < size){
 					block[row][col] = codeword[q];
 					q++;
@@ -1292,15 +1195,109 @@ void interleave(unsigned char *codeword, int block_row_num,int block_col_num, in
 				}
 			}
 		}
-		for(int t = 0; t < block_col_num; t++){
-			for(int p = 0; p < block_row_num; p++){
+		for(int t = 0; t < BLOCK_COL_INTER; t++){
+			for(int p = 0; p < BLOCK_ROW_INTER; p++){
 					codeword_interleaved[r] = block[t][p];
 					r++;
 			}
 		}
 	}
+	return size;
 }
 
-void deinterleave(unsigned char *codeword_interleaved, int block_row_num,int block_col_num , int size){
-	interleave(codeword_interleaved, block_row_num,block_col_num , size);
+int deinterleave(unsigned char *codeword_interleaved , int size,unsigned char* codeword_deinterleaved ){
+
+	interleave(codeword_interleaved , size,codeword_deinterleaved);
+	bool end = false;
+	while(!end){
+	  if( memcmp(codeword_deinterleaved[size-1], 0xFF, 1) != 0){
+		size--;
+	  }
+	  else{
+		size --;
+		end = true;
+	  }
+	}
+	return size;
+}
+
+int encode (uint8_t* Buffer, uint8_t* conv_encoded, int packet_size)
+{
+	 /////////////////////////////////////////////////////////////////////////
+	//            //ENCODED REED SOLOMON LIBCORRECT
+	//            print_word(TELEMETRY_PACKET_SIZE+4, Buffer);
+	//
+	//            static const uint16_t correct_rs_primitive_polynomial_ccsds = 0x187;  // x^8 + x^7 + x^2 + x + 1
+	//            size_t block_length = 255;
+	//            size_t min_distance = 32;
+	//            size_t message_length = block_length-min_distance;
+	//
+	//            correct_reed_solomon *rs = correct_reed_solomon_create(correct_rs_primitive_polynomial_ccsds, 1, 1, min_distance);
+	//
+	//            uint8_t rs_encoded[message_length];
+	//            ssize_t size_encode = correct_reed_solomon_encode(rs, Buffer, message_length,rs_encoded);
+	//            print_word(size_encode, rs_encoded);
+	//
+	//			// add two random errors to codeword
+	//			unsigned char r = rand() % 256;
+	//			int rloc = rand() % (TELEMETRY_PACKET_SIZE+4);
+	//			rs_encoded[rloc] = r;
+	//
+	//			unsigned char r2 = rand() % 256;
+	//			int rloc2 = rand() % (TELEMETRY_PACKET_SIZE+4);
+	//			rs_encoded[rloc2] = r2;
+	//			print_word(size_encode, rs_encoded);
+	//
+	//            uint8_t rs_decoded[message_length];
+	//            ssize_t size_decode = correct_reed_solomon_decode(rs, rs_encoded, size_encode,rs_decoded);
+	//            print_word(size_decode, rs_decoded);
+
+	//ENCODE REED SOLOMON
+	unsigned char codeword[256];
+
+	/* Initialization the ECC library */
+	initialize_ecc ();
+	srand(time(NULL));   // Initialization, should only be called once.
+
+	int ML = packet_size + NPAR;
+	print_word(packet_size, Buffer);
+	encode_data(Buffer, packet_size, codeword);
+	//print_word(ML, codeword);
+
+
+
+
+	//INTERLEAVE
+	unsigned char codeword_interleaved[127]; //127 is the maximum value it can get taking into account the tinygs maximum length is 255 and that the convolutional code adds redundant bytes
+	int size = interleave(codeword, ML, codeword_interleaved);
+	print_word(size, codeword_interleaved);
+
+	//ENCODE CONVOLUTIONAL
+
+	uint8_t msg[size];
+	memcpy(msg, codeword_interleaved, size);
+
+	correct_convolutional *conv;
+
+	//create convolutional config
+	conv = correct_convolutional_create(RATE_CON, ORDER_CON, correct_conv_r12_7_polynomial);
+
+	//get size of encoded message in bytes
+	size_t len_to_encode = correct_convolutional_encode_len(conv, size);
+	int len_to_encode_bytes = ceil(len_to_encode/8);
+
+	//encode message
+	size_t encoded_len_bits = correct_convolutional_encode(conv,msg,size,conv_encoded);
+	int encoded_len_bytes = ceil(encoded_len_bits/8);
+
+	//add random errors
+	uint8_t r3 = rand() % 256;
+	int rloc3 = rand() % (encoded_len_bytes);
+	conv_encoded[rloc3] = r3;
+
+	uint8_t r4 = rand() % 256;
+	int rloc4 = rand() % (encoded_len_bits/8);
+	conv_encoded[rloc4] = r4;
+	return len_to_encode_bytes;
+
 }
